@@ -1,5 +1,4 @@
 """Tests for error types."""
-import pytest
 from capiscio_a2a_security.errors import (
     CapiscioSecurityError,
     CapiscioValidationError,

@@ -13,7 +13,7 @@ def test_validate_valid_https_url(validator):
     """Test validation of valid HTTPS URL."""
     result = validator.validate_url("https://example.com")
     assert result.success
-    assert result.score == 100
+    assert result.trust.total == 100
     assert len(result.errors) == 0
 
 
@@ -84,7 +84,7 @@ def test_validate_standard_port_ok(validator):
     """Test that standard HTTPS port 443 is OK."""
     result = validator.validate_url("https://example.com:443")
     assert result.success
-    assert result.score == 100
+    assert result.trust.total == 100
 
 
 def test_validate_missing_scheme(validator):
@@ -113,4 +113,4 @@ def test_validate_http_allowed_when_not_required(validator):
     """Test that HTTP is allowed when HTTPS is not required."""
     result = validator.validate_url("http://example.com", require_https=False)
     assert result.success
-    assert result.score >= 80
+    assert result.trust.total >= 80

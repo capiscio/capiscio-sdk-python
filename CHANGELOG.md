@@ -5,48 +5,61 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2025-10-09
+## [0.1.0] - 2025-01-10
 
 ### Added
-- **Foundation Layer (Phase 1)**
+- **Comprehensive Integration Tests (26 tests)**
+  - Real A2A SDK integration testing with official types
+  - All Part types tested: TextPart, FilePart (bytes/URI), DataPart, mixed parts
+  - Both role values tested: user, agent
+  - Optional fields tested: contextId, taskId, metadata
+  - Edge cases: empty text, long text (10KB), Unicode/special characters
+  - Security patterns: XSS attempts, SQL injection, oversized messages (100+ parts), null bytes
+  - Malformed messages: invalid roles, empty messageId, empty parts array
+  - Coverage: All tests passing in ~1.27 seconds
+
+- **GitHub Actions CI/CD**
+  - `pr-checks.yml`: Comprehensive PR validation (Python 3.10-3.13, linting, type checking, tests, security scanning)
+  - Enhanced `publish.yml`: Now runs full test suite before publishing to PyPI
+  - `docs.yml`: Automated documentation deployment (GitHub Pages, Cloudflare Pages)
+
+- **Foundation Layer**
   - Core types: `ValidationResult`, `ValidationIssue`, `ValidationSeverity`, `RateLimitInfo`, `CacheEntry`
   - Error hierarchy: 7 exception classes for different security scenarios
   - Configuration system with 4 presets: `development()`, `production()`, `strict()`, `from_env()`
-  - Comprehensive unit tests (16 tests, 100% passing)
 
-- **Validators (Phase 2)**
-  - `MessageValidator`: Validates A2A message structure (ID, sender, recipient, timestamp, parts)
+- **Validators**
+  - `MessageValidator`: Validates A2A v0.3.0 message structure
+    - Required fields: `messageId` (non-empty string), `role` (enum), `parts` (array)
+    - Optional fields: `contextId`, `taskId`, `metadata`
+    - Supports all Part types: `TextPart`, `FilePart` (FileWithBytes/FileWithUri), `DataPart`
+    - Part validation: kind discriminator ("text"|"file"|"data") with type-specific validation
   - `ProtocolValidator`: Validates protocol version, headers, and message types
-  - Comprehensive validation with error and warning levels
-  - Unit tests (22 tests, 100% passing)
 
-- **Infrastructure (Phase 3)**
+- **Infrastructure**
   - `ValidationCache`: TTL-based in-memory cache with invalidation support
   - `RateLimiter`: Token bucket algorithm with per-identifier rate limiting
   - Configurable cache size and TTL
-  - Unit tests (13 tests, 100% passing)
 
-- **Security Executor (Phase 4)**
-  - `CapiscioSecurityExecutor`: Main wrapper for agent executors
+- **Security Executor**
+  - `CapiscIOSecurityExecutor`: Main wrapper for agent executors
   - Three integration patterns:
     - Minimal: `secure(agent)` - one-liner integration
-    - Explicit: `CapiscioSecurityExecutor(agent, config)` - full control
+    - Explicit: `CapiscIOSecurityExecutor(agent, config)` - full control
     - Decorator: `@secure_agent(config)` - pythonic decorator pattern
   - Configurable fail modes: `block`, `monitor`, `log`
   - Request rate limiting with identifier-based buckets
   - Validation result caching for performance
-  - Unit tests (12 tests, 100% passing)
 
 - **Documentation**
-  - Comprehensive README with all integration patterns
-  - Usage examples for all three patterns
-  - Configuration preset documentation
-  - Apache 2.0 license
-  - Contributing guidelines
-  - Security policy
+  - Complete rewrite of all examples to use official A2A SDK types
+  - Updated configuration guide with correct A2A message fields
+  - Comprehensive quickstart with real-world integration examples
+  - API reference documentation
+  - Apache 2.0 license, Contributing guidelines, Security policy
 
 ### Technical Details
-- Python 3.10+ support
+- Python 3.10+ support (tested on 3.10, 3.11, 3.12, 3.13)
 - Type hints with `py.typed` marker
 - Pydantic models for validation
 - Token bucket rate limiting algorithm
@@ -54,11 +67,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Delegate pattern for attribute access
 
 ### Test Coverage
-- **Total: 63 tests, 100% passing**
-  - Foundation: 16 tests
-  - Validators: 22 tests  
-  - Infrastructure: 13 tests
-  - Executor: 12 tests
+- **Total: 150 tests, 99.3% passing (149 passing, 1 skipped)**
+  - Unit tests: 124 tests (including 14 MessageValidator tests)
+  - Integration tests: 26 tests (all passing)
+  - Skipped: 1 module (test_executor.py - covered by integration tests)
+
+### Release Notes
+This is an **early 0.1.0 release**. While the middleware has comprehensive test coverage (150 tests) and validates all official A2A message structures correctly, it has not yet been battle-tested in production environments. We recommend:
+
+- ✅ **Safe for**: Development environments, testing, evaluation
+- ⚠️ **Use with monitoring**: Staging environments, non-critical production
+- ❌ **Not yet ready for**: Mission-critical production without extensive internal testing
+
+**Planned for v1.0**: Load testing, stress testing, concurrent request testing, performance benchmarking, production hardening based on real-world feedback
+
+### Installation
+```bash
+pip install capiscio-a2a-security==0.1.0
+```
 
 ---
 

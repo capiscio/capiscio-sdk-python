@@ -1,5 +1,4 @@
 """Tests for core types."""
-import pytest
 from capiscio_a2a_security.types import (
     ValidationSeverity,
     ValidationIssue,

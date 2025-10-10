@@ -1,4 +1,4 @@
-# Capiscio A2A Security
+# CapiscIO A2A Security
 
 **Runtime security middleware for A2A (Agent-to-Agent) protocol agents**
 
@@ -6,11 +6,9 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-> 🚧 **Status:** Alpha - Under active development
+## What is CapiscIO A2A Security?
 
-## What is Capiscio A2A Security?
-
-Capiscio A2A Security provides **always-on runtime protection** for agents using the [A2A (Agent-to-Agent) protocol](https://github.com/google/A2A). It wraps your agent executor to validate incoming requests, verify signatures, and protect against malicious actors—all without requiring peer cooperation.
+CapiscIO A2A Security provides **always-on runtime protection** for agents using the [A2A (Agent-to-Agent) protocol](https://github.com/google/A2A). It wraps your agent executor to validate incoming requests, verify signatures, and protect against malicious actors—all without requiring peer cooperation.
 
 ### Key Features
 
@@ -30,52 +28,65 @@ pip install capiscio-a2a-security
 
 ## Quick Start
 
-### Pattern 1: Minimal (One-liner)
+
+### Pattern 1: Minimal (One-liner with Preset)
 
 ```python
-from capiscio_a2a_security import secure
+from capiscio_a2a_security import secure, SecurityConfig
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 
 # Wrap your agent with security (production defaults)
-agent = secure(MyAgentExecutor())
+agent = secure(MyAgentExecutor(), SecurityConfig.production())
 
 # Use in A2A request handler
 handler = DefaultRequestHandler(
     agent_executor=agent,
     task_store=InMemoryTaskStore()
 )
+
+# Access validation results (three-dimensional scoring)
+result = await agent.validate_agent_card(card_url)
+print(result.compliance.total, result.trust.total, result.availability.total)
 ```
 
-### Pattern 2: Explicit Configuration
+### Pattern 2: Granular Control
 
 ```python
-from capiscio_a2a_security import CapiscioSecurityExecutor, SecurityConfig
+from capiscio_a2a_security import CapiscIOSecurityExecutor, SecurityConfig
 
-# Full control over configuration
-secure_agent = CapiscioSecurityExecutor(
+# Start with a preset, customize what matters to you
+config = SecurityConfig.production()
+config.downstream.rate_limit_requests_per_minute = 100  # Higher rate limit
+config.downstream.require_signatures = True             # Enforce signatures
+config.upstream.test_endpoints = True                   # Test before calling
+config.fail_mode = "monitor"                            # Log but don't block yet
+
+secure_agent = CapiscIOSecurityExecutor(
     delegate=MyAgentExecutor(),
-    config=SecurityConfig.production()  # or .development() or .strict()
+    config=config
 )
 ```
 
-### Pattern 3: Decorator (Most Pythonic)
+### Pattern 3: Environment-Driven (12-Factor App)
 
 ```python
-from capiscio_a2a_security import secure_agent
+from capiscio_a2a_security import secure_agent, SecurityConfig
 from a2a import AgentExecutor, RequestContext, EventQueue
 
-@secure_agent(config=SecurityConfig.production())
+@secure_agent(config=SecurityConfig.from_env())
 class MyAgentExecutor(AgentExecutor):
     async def execute(self, context: RequestContext, event_queue: EventQueue):
-        # Your agent logic here
+        # Your agent logic - config loaded from env vars
         pass
 
 # Already secured - use directly!
 handler = DefaultRequestHandler(agent_executor=MyAgentExecutor())
 ```
 
-## Why Capiscio?
+**All 16 configuration options documented in the [Configuration Guide](https://docs.capisc.io/a2a-security/guides/configuration/).**
+
+## Why CapiscIO?
 
 ### The Problem
 
@@ -87,13 +98,13 @@ When building A2A agents, you face security risks from:
 
 ### The Solution
 
-Capiscio wraps your agent executor and provides:
+CapiscIO wraps your agent executor and provides:
 
 1. **Downstream Protection** - Validates all incoming requests
 2. **Upstream Protection** - Validates agents you call
 3. **Always-On** - Works without peer cooperation
 4. **Performance** - Caching and parallel validation
-5. **Enterprise-Ready** - Audit logs, compliance, policies
+5. **Three-Dimensional Scoring** - Compliance, trust, and availability insights
 
 ## Configuration
 
@@ -161,7 +172,7 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ## About A2A
 
-The [Agent-to-Agent (A2A) protocol](https://github.com/google/A2A) is an open standard for agent interoperability, supported by Google and 50+ partners including Salesforce, ServiceNow, SAP, Intuit, and more. Capiscio provides the security layer for production A2A deployments.
+The [Agent-to-Agent (A2A) protocol](https://github.com/google/A2A) is an open standard for agent interoperability, supported by Google and 50+ partners including Salesforce, ServiceNow, SAP, Intuit, and more. CapiscIO provides the security layer for production A2A deployments.
 
 ## Support
 

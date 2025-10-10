@@ -2,8 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from ..types import ValidationResult, ValidationIssue, ValidationSeverity
-from ..errors import CapiscioSignatureError
+from ..types import ValidationResult, ValidationIssue, ValidationSeverity, create_simple_validation_result
 
 logger = logging.getLogger(__name__)
 
@@ -11,14 +10,14 @@ logger = logging.getLogger(__name__)
 class SignatureValidator:
     """Validates JWS signatures on A2A messages and agent cards."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize signature validator."""
         self._crypto_available = self._check_crypto_availability()
 
     def _check_crypto_availability(self) -> bool:
         """Check if cryptography library is available."""
         try:
-            import jwt  # PyJWT for JWS validation
+            import jwt  # PyJWT for JWS validation  # noqa: F401
             return True
         except ImportError:
             logger.warning(
@@ -56,10 +55,11 @@ class SignatureValidator:
                     path="signatures",
                 )
             )
-            return ValidationResult(
+            return create_simple_validation_result(
                 success=False,
-                score=0,
                 issues=issues,
+                simple_score=0,
+                dimension="trust"
             )
 
         # Check signature format
@@ -72,7 +72,12 @@ class SignatureValidator:
                     path="signatures",
                 )
             )
-            return ValidationResult(success=False, score=0, issues=issues)
+            return create_simple_validation_result(
+                success=False,
+                issues=issues,
+                simple_score=0,
+                dimension="trust"
+            )
 
         # JWS signatures should have 3 parts separated by dots
         parts = signature.split('.')
@@ -93,7 +98,7 @@ class SignatureValidator:
                 import jwt
                 
                 # Verify signature
-                decoded = jwt.decode(
+                jwt.decode(
                     signature,
                     public_key,
                     algorithms=['RS256', 'ES256', 'PS256'],
@@ -161,10 +166,11 @@ class SignatureValidator:
         # Ensure score doesn't go negative
         score = max(0, score)
 
-        return ValidationResult(
+        return create_simple_validation_result(
             success=score >= 60 and not any(i.severity == ValidationSeverity.ERROR for i in issues),
-            score=score,
             issues=issues,
+            simple_score=score,
+            dimension="trust"
         )
 
     def validate_signatures(
@@ -195,12 +201,18 @@ class SignatureValidator:
                     path="signatures",
                 )
             )
-            return ValidationResult(success=False, score=50, issues=all_issues)
+            return create_simple_validation_result(
+                success=False,
+                issues=all_issues,
+                simple_score=50,
+                dimension="trust"
+            )
 
         for i, sig in enumerate(signatures):
             result = self.validate_signature(payload, sig)
             all_issues.extend(result.issues)
-            total_score += result.score
+            # Use trust.total since signature validation is trust-related
+            total_score += result.trust.total if result.trust else 0
             
             if result.success:
                 valid_count += 1
@@ -208,13 +220,15 @@ class SignatureValidator:
         # Calculate average score
         avg_score = total_score // len(signatures) if signatures else 0
 
-        return ValidationResult(
+        result = create_simple_validation_result(
             success=valid_count > 0,
-            score=avg_score,
             issues=all_issues,
-            metadata={
-                "total_signatures": len(signatures),
-                "valid_signatures": valid_count,
-                "failed_signatures": len(signatures) - valid_count,
-            }
+            simple_score=avg_score,
+            dimension="trust"
         )
+        result.metadata = {
+            "total_signatures": len(signatures),
+            "valid_signatures": valid_count,
+            "failed_signatures": len(signatures) - valid_count,
+        }
+        return result

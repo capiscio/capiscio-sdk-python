@@ -1,7 +1,6 @@
 """Tests for protocol validator."""
 import pytest
 from capiscio_a2a_security.validators.protocol import ProtocolValidator
-from capiscio_a2a_security.types import ValidationSeverity
 
 
 @pytest.fixture

@@ -16,7 +16,7 @@ class ValidationCache:
             max_size: Maximum number of entries to cache
             ttl: Time-to-live in seconds (default 5 minutes)
         """
-        self._cache: TTLCache = TTLCache(maxsize=max_size, ttl=ttl)
+        self._cache: TTLCache[str, CacheEntry] = TTLCache(maxsize=max_size, ttl=ttl)
         self._ttl = ttl
 
     def get(self, key: str) -> Optional[ValidationResult]:
@@ -33,7 +33,7 @@ class ValidationCache:
         if entry is None:
             return None
 
-        return entry["result"]
+        return entry.result
 
     def set(self, key: str, result: ValidationResult) -> None:
         """
@@ -43,11 +43,11 @@ class ValidationCache:
             key: Cache key
             result: ValidationResult to cache
         """
-        entry: CacheEntry = {
-            "result": result,
-            "cached_at": time.time(),
-            "expires_at": time.time() + self._ttl,
-        }
+        entry = CacheEntry(
+            result=result,
+            cached_at=time.time(),
+            ttl=self._ttl,
+        )
         self._cache[key] = entry
 
     def invalidate(self, key: str) -> None:

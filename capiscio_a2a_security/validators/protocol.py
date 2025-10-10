@@ -1,6 +1,6 @@
 """Protocol-level validation logic."""
-from typing import Any, Dict, List, Optional
-from ..types import ValidationResult, ValidationIssue, ValidationSeverity
+from typing import Dict, List, Optional
+from ..types import ValidationResult, ValidationIssue, ValidationSeverity, create_simple_validation_result
 from .semver import SemverValidator
 
 
@@ -10,7 +10,7 @@ class ProtocolValidator:
     SUPPORTED_VERSIONS = ["1.0", "1.0.0", "0.3.0"]
     VALID_MESSAGE_TYPES = ["request", "response", "event", "error"]
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize protocol validator."""
         self._semver_validator = SemverValidator()
 
@@ -54,10 +54,11 @@ class ProtocolValidator:
                 )
                 score = 60
 
-        return ValidationResult(
+        return create_simple_validation_result(
             success=score > 0 and not any(i.severity == ValidationSeverity.ERROR for i in issues),
-            score=score,
             issues=issues,
+            simple_score=score,
+            dimension="compliance"
         )
 
     def validate_headers(self, headers: Dict[str, str]) -> ValidationResult:
@@ -112,10 +113,11 @@ class ProtocolValidator:
 
         score = max(0, score)
 
-        return ValidationResult(
+        return create_simple_validation_result(
             success=score >= 70,
-            score=score,
             issues=issues,
+            simple_score=score,
+            dimension="compliance"
         )
 
     def validate_message_type(self, message_type: Optional[str]) -> ValidationResult:
@@ -152,8 +154,9 @@ class ProtocolValidator:
             )
             score = 80
 
-        return ValidationResult(
+        return create_simple_validation_result(
             success=True,  # Message type is informational
-            score=score,
             issues=issues,
+            simple_score=score,
+            dimension="compliance"
         )

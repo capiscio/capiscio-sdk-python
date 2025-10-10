@@ -1,14 +1,13 @@
 """Tests for Certificate validator."""
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch
 from datetime import datetime, timedelta
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
 
 from capiscio_a2a_security.validators.certificate import CertificateValidator
 from capiscio_a2a_security.types import ValidationSeverity
@@ -188,7 +187,7 @@ def test_validate_hostname_wildcard_match(validator):
     
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "*.example.com")])
     
-    cert = (
+    (
         x509.CertificateBuilder()
         .subject_name(subject)
         .issuer_name(subject)
@@ -245,7 +244,8 @@ def test_validate_certificate_chain_valid(validator):
     result = validator.validate_certificate_chain(cert, [issuer_cert])
     
     # Basic chain validation - may not be perfect but should not error on structure
-    assert result.score > 0
+    # Certificate validation is trust-related
+    assert result.trust.total > 0
 
 
 def test_validate_certificate_chain_empty(validator):

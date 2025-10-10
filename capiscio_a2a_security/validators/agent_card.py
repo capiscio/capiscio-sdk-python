@@ -17,6 +17,7 @@ Validates:
 from typing import Any, Dict, List, Optional
 import httpx
 from ..types import ValidationResult, ValidationIssue, ValidationSeverity
+from ..scoring import ComplianceScorer, TrustScorer, AvailabilityScorer
 from .url_security import URLSecurityValidator
 from .semver import SemverValidator
 
@@ -61,6 +62,11 @@ class AgentCardValidator:
         self.http_client = http_client or httpx.AsyncClient(timeout=10.0)
         self.url_validator = url_validator or URLSecurityValidator()
         self.semver_validator = semver_validator or SemverValidator()
+        
+        # Initialize scorers
+        self.compliance_scorer = ComplianceScorer()
+        self.trust_scorer = TrustScorer()
+        self.availability_scorer = AvailabilityScorer()
     
     async def fetch_and_validate(self, agent_url: str) -> ValidationResult:
         """Fetch agent card from URL and validate it.
@@ -78,7 +84,14 @@ class AgentCardValidator:
             url_result = self.url_validator.validate_url(agent_url, field_name="agent_url", require_https=True)
             if not url_result.success:
                 issues.extend(url_result.issues)
-                return ValidationResult(success=False, score=0, issues=issues)
+                # Return with zero scores for all dimensions
+                return ValidationResult(
+                    success=False,
+                    compliance=self.compliance_scorer.score_agent_card({}, issues),
+                    trust=self.trust_scorer.score_agent_card({}, issues),
+                    availability=self.availability_scorer.score_not_tested("URL validation failed"),
+                    issues=issues
+                )
             
             # Fetch agent card from well-known location
             card_url = f"{agent_url.rstrip('/')}/.well-known/agent-card.json"
@@ -97,7 +110,13 @@ class AgentCardValidator:
                 message=f"Failed to fetch agent card (HTTP {e.response.status_code}): {str(e)}",
                 path="agent_card"
             ))
-            return ValidationResult(success=False, score=0, issues=issues)
+            return ValidationResult(
+                success=False,
+                compliance=self.compliance_scorer.score_agent_card({}, issues),
+                trust=self.trust_scorer.score_agent_card({}, issues),
+                availability=self.availability_scorer.score_not_tested("HTTP error fetching card"),
+                issues=issues
+            )
         except httpx.RequestError as e:
             issues.append(ValidationIssue(
                 severity=ValidationSeverity.ERROR,
@@ -105,7 +124,13 @@ class AgentCardValidator:
                 message=f"Failed to fetch agent card: {str(e)}",
                 path="agent_card"
             ))
-            return ValidationResult(success=False, score=0, issues=issues)
+            return ValidationResult(
+                success=False,
+                compliance=self.compliance_scorer.score_agent_card({}, issues),
+                trust=self.trust_scorer.score_agent_card({}, issues),
+                availability=self.availability_scorer.score_not_tested("Network error fetching card"),
+                issues=issues
+            )
         except Exception as e:
             issues.append(ValidationIssue(
                 severity=ValidationSeverity.ERROR,
@@ -113,16 +138,23 @@ class AgentCardValidator:
                 message=f"Agent card validation error: {str(e)}",
                 path="agent_card"
             ))
-            return ValidationResult(success=False, score=0, issues=issues)
+            return ValidationResult(
+                success=False,
+                compliance=self.compliance_scorer.score_agent_card({}, issues),
+                trust=self.trust_scorer.score_agent_card({}, issues),
+                availability=self.availability_scorer.score_not_tested("Validation error"),
+                issues=issues
+            )
     
-    def validate_agent_card(self, card: Dict[str, Any]) -> ValidationResult:
+    def validate_agent_card(self, card: Dict[str, Any], skip_signature_verification: bool = True) -> ValidationResult:
         """Validate agent card structure and content.
         
         Args:
             card: Agent card dictionary
+            skip_signature_verification: Whether to skip signature verification (default True for now)
             
         Returns:
-            ValidationResult with validation issues and score
+            ValidationResult with three-dimensional scoring
         """
         issues: List[ValidationIssue] = []
         
@@ -159,14 +191,19 @@ class AgentCardValidator:
         if "additionalInterfaces" in card:
             issues.extend(self._validate_additional_interfaces(card["additionalInterfaces"], card))
         
-        # Calculate score
-        error_count = sum(1 for i in issues if i.severity == ValidationSeverity.ERROR)
-        warning_count = sum(1 for i in issues if i.severity == ValidationSeverity.WARNING)
-        score = max(0, 100 - (error_count * 15) - (warning_count * 5))
+        # Calculate three-dimensional scores
+        compliance = self.compliance_scorer.score_agent_card(card, issues)
+        trust = self.trust_scorer.score_agent_card(card, issues, skip_signature_verification)
+        availability = self.availability_scorer.score_not_tested("Schema-only validation")
+        
+        # Determine success based on error presence
+        has_errors = any(i.severity == ValidationSeverity.ERROR for i in issues)
         
         return ValidationResult(
-            success=error_count == 0,
-            score=score,
+            success=not has_errors,
+            compliance=compliance,
+            trust=trust,
+            availability=availability,
             issues=issues
         )
     
@@ -273,7 +310,7 @@ class AgentCardValidator:
                     severity=issue.severity,
                     code=issue.code,
                     message=f"Provider URL: {issue.message}",
-                    path=f"agent_card.provider.url"
+                    path="agent_card.provider.url"
                 ))
         
         return issues

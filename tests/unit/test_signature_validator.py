@@ -15,13 +15,13 @@ def test_validate_signature_format(validator):
     signature = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U"
     result = validator.validate_signature({}, signature)
     
-    # If PyJWT is not installed, score will be 0 (with warning)
-    # If installed, score should be > 0
+    # If PyJWT is not installed, trust score will be 0 (with warning)
+    # If installed, trust score should be > 0
     if not validator._crypto_available:
-        assert result.score == 0
+        assert result.trust.total == 0
         assert any(i.code == "CRYPTO_NOT_AVAILABLE" for i in result.warnings)
     else:
-        assert result.score > 0
+        assert result.trust.total > 0
 
 
 def test_validate_invalid_signature_format(validator):

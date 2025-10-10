@@ -1,4 +1,4 @@
-# Contributing to Capiscio A2A Security
+# Contributing to CapiscIO A2A Security
 
 Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
 
@@ -147,7 +147,7 @@ def validate_message(message: Message) -> ValidationResult:
         ValidationResult with success status and issues
         
     Raises:
-        CapiscioValidationError: If validation fails critically
+        CapiscIOValidationError: If validation fails critically
     """
 ```
 

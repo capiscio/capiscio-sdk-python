@@ -32,7 +32,7 @@ Include:
 
 ## Security Best Practices
 
-When using Capiscio A2A Security:
+When using CapiscIO A2A Security:
 
 1. **Keep dependencies updated**
    ```bash

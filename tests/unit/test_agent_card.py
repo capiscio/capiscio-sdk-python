@@ -1,7 +1,7 @@
 """Tests for Agent Card validator."""
 
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, Mock
 import httpx
 
 from capiscio_a2a_security.validators.agent_card import AgentCardValidator

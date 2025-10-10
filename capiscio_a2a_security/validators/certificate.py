@@ -12,8 +12,8 @@ Validates:
 - Certificate trust
 """
 
-from typing import Optional, List, Tuple
-from datetime import datetime, timedelta
+from typing import Optional, List
+from datetime import datetime
 import ssl
 import socket
 from urllib.parse import urlparse
@@ -22,7 +22,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID
 import httpx
 
-from ..types import ValidationResult, ValidationIssue, ValidationSeverity
+from ..types import ValidationResult, ValidationIssue, ValidationSeverity, create_simple_validation_result
 
 
 class CertificateValidator:
@@ -73,7 +73,12 @@ class CertificateValidator:
                     message="Certificate validation only applies to HTTPS URLs",
                     path="certificate"
                 ))
-                return ValidationResult(success=True, score=80, issues=issues)
+                return create_simple_validation_result(
+                    success=True,
+                    issues=issues,
+                    simple_score=80,
+                    dimension="trust"
+                )
             
             hostname = parsed.hostname
             port = parsed.port or 443
@@ -85,7 +90,12 @@ class CertificateValidator:
                     message="Cannot extract hostname from URL",
                     path="certificate"
                 ))
-                return ValidationResult(success=False, score=0, issues=issues)
+                return create_simple_validation_result(
+                    success=False,
+                    issues=issues,
+                    simple_score=0,
+                    dimension="trust"
+                )
             
             # Get certificate from server
             cert_pem = self._get_certificate(hostname, port)
@@ -96,7 +106,12 @@ class CertificateValidator:
                     message=f"Failed to fetch certificate from {hostname}:{port}",
                     path="certificate"
                 ))
-                return ValidationResult(success=False, score=0, issues=issues)
+                return create_simple_validation_result(
+                    success=False,
+                    issues=issues,
+                    simple_score=0,
+                    dimension="trust"
+                )
             
             # Parse certificate
             cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
@@ -114,10 +129,11 @@ class CertificateValidator:
             warning_count = sum(1 for i in issues if i.severity == ValidationSeverity.WARNING)
             score = max(0, 100 - (error_count * 25) - (warning_count * 10))
             
-            return ValidationResult(
+            return create_simple_validation_result(
                 success=error_count == 0,
-                score=score,
-                issues=issues
+                issues=issues,
+                simple_score=score,
+                dimension="trust"
             )
             
         except Exception as e:
@@ -127,7 +143,12 @@ class CertificateValidator:
                 message=f"Certificate validation error: {str(e)}",
                 path="certificate"
             ))
-            return ValidationResult(success=False, score=0, issues=issues)
+            return create_simple_validation_result(
+                success=False,
+                issues=issues,
+                simple_score=0,
+                dimension="trust"
+            )
     
     def _get_certificate(self, hostname: str, port: int) -> Optional[str]:
         """Retrieve certificate from server.
@@ -146,7 +167,7 @@ class CertificateValidator:
                     cert_der = ssock.getpeercert(binary_form=True)
                     if cert_der:
                         cert = x509.load_der_x509_certificate(cert_der, default_backend())
-                        return cert.public_bytes(encoding=x509.Encoding.PEM).decode()
+                        return cert.public_bytes(encoding=x509.Encoding.PEM).decode()  # type: ignore[attr-defined]
             return None
         except Exception:
             return None
@@ -221,7 +242,7 @@ class CertificateValidator:
                     x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME
                 )
                 san_names = [
-                    str(name.value) for name in san_ext.value
+                    str(name.value) for name in san_ext.value  # type: ignore[attr-defined]
                     if isinstance(name, x509.DNSName)
                 ]
             except x509.ExtensionNotFound:
@@ -341,10 +362,11 @@ class CertificateValidator:
             warning_count = sum(1 for i in issues if i.severity == ValidationSeverity.WARNING)
             score = max(0, 100 - (error_count * 25) - (warning_count * 10))
             
-            return ValidationResult(
+            return create_simple_validation_result(
                 success=error_count == 0,
-                score=score,
-                issues=issues
+                issues=issues,
+                simple_score=score,
+                dimension="trust"
             )
         
         except Exception as e:
@@ -354,4 +376,9 @@ class CertificateValidator:
                 message=f"Certificate chain validation error: {str(e)}",
                 path="certificate.chain"
             ))
-            return ValidationResult(success=False, score=0, issues=issues)
+            return create_simple_validation_result(
+                success=False,
+                issues=issues,
+                simple_score=0,
+                dimension="trust"
+            )

@@ -3,6 +3,11 @@ import logging
 from typing import Any, Dict, Optional, Callable
 from functools import wraps
 
+try:
+    from a2a.server.agent_execution import RequestContext
+except ImportError:
+    RequestContext = Any  # type: ignore[misc,assignment]
+
 from .config import SecurityConfig
 from .validators import MessageValidator, ProtocolValidator
 from .infrastructure import ValidationCache, RateLimiter
@@ -10,7 +15,6 @@ from .types import ValidationResult
 from .errors import (
     CapiscioValidationError,
     CapiscioRateLimitError,
-    CapiscioSecurityError,
 )
 
 logger = logging.getLogger(__name__)
@@ -21,7 +25,7 @@ class CapiscioSecurityExecutor:
     Security wrapper for A2A agent executors.
     
     Provides runtime validation, rate limiting, and security checks
-    for A2A agent interactions.
+    for A2A agent interactions. Implements the AgentExecutor interface.
     """
 
     def __init__(
@@ -33,7 +37,7 @@ class CapiscioSecurityExecutor:
         Initialize security executor.
 
         Args:
-            delegate: The agent executor to wrap
+            delegate: The agent executor to wrap (must implement AgentExecutor interface)
             config: Security configuration (defaults to production preset)
         """
         self.delegate = delegate
@@ -44,6 +48,9 @@ class CapiscioSecurityExecutor:
         self._protocol_validator = ProtocolValidator()
         
         # Initialize infrastructure
+        self._cache: Optional[ValidationCache]
+        self._rate_limiter: Optional[RateLimiter]
+        
         if self.config.upstream.cache_validation:
             self._cache = ValidationCache(
                 max_size=1000,
@@ -59,23 +66,30 @@ class CapiscioSecurityExecutor:
         else:
             self._rate_limiter = None
 
-    def execute(self, message: Dict[str, Any], **kwargs) -> Any:
+    async def execute(self, context: RequestContext, event_queue: Any) -> None:
         """
         Execute agent with security checks.
 
         Args:
-            message: The A2A message to process
-            **kwargs: Additional arguments passed to delegate
-
-        Returns:
-            Result from delegate execution
+            context: RequestContext with message and task information
+            event_queue: EventQueue for publishing events
 
         Raises:
-            CapiscioValidationError: If validation fails
-            CapiscioRateLimitError: If rate limit exceeded
+            CapiscioValidationError: If validation fails in block mode
+            CapiscioRateLimitError: If rate limit exceeded in block mode
         """
-        # Extract identifier for rate limiting (sender URL or ID)
-        identifier = self._extract_identifier(message)
+        # Extract message for validation
+        message = context.message
+        if not message:
+            logger.warning("No message in context")
+            await self.delegate.execute(context, event_queue)
+            return
+        
+        # Convert message to dict for validation (our validators expect dict format)
+        message_dict = message.model_dump() if hasattr(message, 'model_dump') else {}
+        
+        # Extract identifier for rate limiting
+        identifier = message_dict.get("message_id") or message.message_id
         
         # Check rate limit
         if self._rate_limiter and identifier:
@@ -90,7 +104,7 @@ class CapiscioSecurityExecutor:
 
         # Validate message
         if self.config.downstream.validate_schema:
-            validation_result = self._validate_message(message)
+            validation_result = self._validate_message(message_dict)
             
             if not validation_result.success:
                 error = CapiscioValidationError(
@@ -106,20 +120,23 @@ class CapiscioSecurityExecutor:
 
         # Execute delegate
         try:
-            result = self.delegate.execute(message, **kwargs)
-            return result
+            await self.delegate.execute(context, event_queue)
         except Exception as e:
             if self.config.fail_mode != "log":
                 raise
             logger.error(f"Delegate execution failed: {e}")
             raise
 
-    def _extract_identifier(self, message: Dict[str, Any]) -> Optional[str]:
-        """Extract identifier from message for rate limiting."""
-        sender = message.get("sender", {})
-        if isinstance(sender, dict):
-            return sender.get("url") or sender.get("id")
-        return None
+    async def cancel(self, context: RequestContext, event_queue: Any) -> None:
+        """
+        Cancel task with passthrough to delegate.
+
+        Args:
+            context: RequestContext with task to cancel
+            event_queue: EventQueue for publishing cancellation event
+        """
+        # Cancellation just passes through - no security checks needed
+        await self.delegate.cancel(context, event_queue)
 
     def _validate_message(self, message: Dict[str, Any]) -> ValidationResult:
         """Validate message with caching."""
@@ -137,7 +154,9 @@ class CapiscioSecurityExecutor:
         
         # Cache result
         if self._cache and message.get("id"):
-            self._cache.set(message.get("id"), result)
+            msg_id = message.get("id")
+            if isinstance(msg_id, str):
+                self._cache.set(msg_id, result)
             
         return result
 
@@ -170,7 +189,7 @@ def secure(
 
 def secure_agent(
     config: Optional[SecurityConfig] = None,
-) -> Callable:
+) -> Callable[[type], Callable[..., CapiscioSecurityExecutor]]:
     """
     Decorator to secure an agent executor class (decorator pattern).
 
@@ -188,9 +207,9 @@ def secure_agent(
                 # ... agent logic
         ```
     """
-    def decorator(cls):
+    def decorator(cls: type) -> Callable[..., CapiscioSecurityExecutor]:
         @wraps(cls)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> CapiscioSecurityExecutor:
             instance = cls(*args, **kwargs)
             return CapiscioSecurityExecutor(instance, config)
         return wrapper

@@ -1,6 +1,4 @@
 """Tests for configuration."""
-import pytest
-import os
 from capiscio_a2a_security.config import (
     SecurityConfig,
     DownstreamConfig,

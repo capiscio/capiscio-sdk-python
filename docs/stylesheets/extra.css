@@ -1,0 +1,109 @@
+/* Custom styles for Capiscio A2A Security documentation */
+
+:root {
+  --capiscio-primary: #1976d2;
+  --capiscio-accent: #ffc107;
+}
+
+/* Custom grid cards styling */
+.grid.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.grid.cards > article {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.grid.cards > article:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* Code block enhancements */
+.highlight {
+  border-radius: 0.5rem;
+}
+
+/* Admonition customization */
+.admonition {
+  border-radius: 0.5rem;
+}
+
+/* Tone down the FAQ question admonitions - override Material's bright green */
+details.question {
+  border-color: rgb(0, 184, 212) !important;
+  background-color: rgba(100, 181, 246, 0.05) !important;
+}
+
+details.question > summary {
+  background-color: rgba(100, 181, 246, 0.15) !important;
+}
+
+details.question > summary::before {
+  background-color: rgb(0, 184, 212) !important;
+}
+
+details.question > summary:after {
+    color: rgb(0, 184, 212) !important;
+}
+
+/* Remove green glow/focus state */
+details.question:focus-within,
+details.question[open] {
+  background-color: rgba(100, 181, 246, 0.05) !important;
+  box-shadow: 0 0 0 0.2rem rgba(100, 181, 246, 0.15) !important;
+}
+
+details.question > summary:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Dark mode version */
+[data-md-color-scheme="slate"] details.question {
+  background-color: rgba(100, 181, 246, 0.03) !important;
+}
+
+[data-md-color-scheme="slate"] details.question > summary {
+  background-color: rgba(100, 181, 246, 0.1) !important;
+}
+
+[data-md-color-scheme="slate"] details.question:focus-within,
+[data-md-color-scheme="slate"] details.question[open] {
+  background-color: rgba(100, 181, 246, 0.03) !important;
+}
+
+/* Table of contents */
+.md-sidebar--secondary {
+  position: sticky;
+  top: 4rem;
+}
+
+/* Footer customization */
+.md-footer-meta {
+  background-color: var(--md-footer-bg-color);
+}
+
+/* Version selector */
+.md-version__current {
+  font-weight: 700;
+}
+
+/* Search highlighting */
+mark {
+  background-color: var(--capiscio-accent);
+  color: #000;
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 76.1875em) {
+  .grid.cards {
+    grid-template-columns: 1fr;
+  }
+}
