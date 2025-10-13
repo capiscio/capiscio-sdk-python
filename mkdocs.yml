@@ -70,12 +70,7 @@ theme:
 plugins:
   - search:
       lang: en
-      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
-  
-  - mike:
-      version_selector: false  # Disabled for local dev to prevent versions.json 404s
-      alias_type: symlink
-      canonical_version: latest
+      separator: '[\s\-,:!=\[\]()"<>/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
   
   - mkdocstrings:
       enabled: true
@@ -192,10 +187,6 @@ markdown_extensions:
 
 # Extra configuration
 extra:
-  version:
-    provider: mike
-    default: latest
-  
   homepage: https://docs.capisc.io
   
   social:
