@@ -71,6 +71,7 @@ jobs:
         run: python -m twine check dist/*
       
       - name: Publish to PyPI
+        id: pypi-publish
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           # Using trusted publishing - no password needed
@@ -79,6 +80,7 @@ jobs:
           verbose: true
       
       - name: Create GitHub Release
+        if: success()  # Only create release if PyPI publish succeeded
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
