@@ -55,4 +55,5 @@ pip-wheel-metadata/
 
 # Documentation
 docs/_build/
-site/  # MkDocs build output
+site/
+
