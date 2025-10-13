@@ -1,3 +1,8 @@
+---
+title: Abbreviations Reference
+description: Common abbreviations and acronyms used in A2A Security documentation including A2A, JWS, SSRF, and protocol-related terms.
+---
+
 *[A2A]: Agent-to-Agent Protocol
 *[SSRF]: Server-Side Request Forgery
 *[JWS]: JSON Web Signature

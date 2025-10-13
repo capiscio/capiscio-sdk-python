@@ -1,13 +1,13 @@
 # CapiscIO A2A Security Documentation Configuration
 # MkDocs with Material Theme
 
-site_name: CapiscIO A2A Security
-site_url: https://docs.capisc.io/a2a-security
+site_name: A2A Security
+site_url: https://docs.capisc.io/
 site_description: Runtime security middleware for A2A (Agent-to-Agent) protocol agents. Validate messages, verify signatures, and protect against malicious actors.
 site_author: CapiscIO Team
 copyright: Copyright &copy; 2025 CapiscIO
 
-repo_name: capiscio/a2a-security
+repo_name: a2a-security
 repo_url: https://github.com/capiscio/a2a-security
 edit_uri: edit/main/docs/
 
@@ -37,12 +37,10 @@ theme:
     code: Roboto Mono
   
   features:
-    # Navigation
+    # Navigation - Compatible with unified site navigation.tabs
     - navigation.instant        # SPA-like navigation
     - navigation.instant.progress  # Progress indicator
     - navigation.tracking       # URL updates on scroll
-    - navigation.tabs           # Top-level tabs
-    - navigation.tabs.sticky    # Sticky tabs
     - navigation.sections       # Collapsible sections
     - navigation.expand         # Expand all sections by default
     - navigation.path           # Breadcrumbs
@@ -73,12 +71,6 @@ plugins:
   - search:
       lang: en
       separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
-  
-  # - social:  # Disabled for local development - requires Cairo library on Windows
-  #     cards: true
-  #     cards_layout_options:
-  #       background_color: "#1976d2"
-  #       color: "#ffffff"
   
   - mike:
       version_selector: false  # Disabled for local dev to prevent versions.json 404s
@@ -178,8 +170,11 @@ markdown_extensions:
   - pymdownx.mark
   - pymdownx.smartsymbols
   - pymdownx.snippets:
-      auto_append:
-        - includes/abbreviations.md
+      base_path: [docs, .]
+      # auto_append disabled for monorepo compatibility
+      # auto_append:
+      #   - includes/abbreviations.md
+      check_paths: true
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid
@@ -256,8 +251,8 @@ nav:
       - Scoring System: guides/scoring.md
       - Configuration: guides/configuration.md
   
-  - Changelog: changelog.md
-  - Contributing: contributing.md
+  # - Changelog: changelog.md
+  # - Contributing: contributing.md
   
   # Coming Soon - Uncomment as content is created
   # - User Guides:
@@ -295,6 +290,7 @@ nav:
 # Extra CSS/JS
 extra_css:
   - stylesheets/extra.css
+  - stylesheets/unified.css  # Shared styling from unified site
 
 extra_javascript:
   - javascripts/extra.js

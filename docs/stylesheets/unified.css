@@ -1,0 +1,196 @@
+/* CapiscIO Unified Documentation Styles */
+/* Shared across all product docs for consistency */
+
+:root {
+  --capiscio-primary: #607d8b;
+  --capiscio-accent: #00bcd4;
+}
+
+/* Product navigation tabs styling */
+.md-tabs {
+  background: linear-gradient(135deg, var(--capiscio-primary), var(--capiscio-accent));
+}
+
+/* Product grid on landing page */
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+/* Product cards */
+.product-card {
+    background: var(--md-default-bg-color);
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 0.75rem;
+    padding: 2rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    position: relative;
+    overflow: hidden;
+}
+
+.product-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--md-primary-fg-color), var(--md-accent-fg-color));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.product-card:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    transform: translateY(-4px);
+    border-color: var(--md-accent-fg-color);
+}
+
+.product-card:hover::before {
+    opacity: 1;
+}
+
+.product-card h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: var(--md-primary-fg-color);
+    font-size: 1.4em;
+    font-weight: 600;
+}
+
+.product-card p {
+    margin: 0.75rem 0;
+    line-height: 1.6;
+}
+
+.product-card strong {
+    color: var(--md-accent-fg-color);
+    display: block;
+    margin-top: 1rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.95em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.product-card ul {
+    margin: 0.5rem 0 1.5rem 0;
+    padding-left: 0;
+    list-style: none;
+}
+
+.product-card li {
+    margin: 0.5rem 0;
+    padding-left: 0;
+}
+
+.product-card img[src*="badge"] {
+    display: inline-block;
+    margin: 0.5rem 0.25rem;
+}
+
+.product-card .md-button {
+    margin: 0.5rem 0.5rem 0.5rem 0;
+    font-size: 0.9em;
+}
+
+/* Link grid */
+.link-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.25rem;
+    margin: 2rem 0;
+}
+
+.link-grid ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: contents;
+}
+
+.link-grid li {
+    background: var(--md-default-bg-color);
+    border: 1px solid var(--md-default-fg-color--lightest);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.link-grid li:hover {
+    background: var(--md-code-bg-color);
+    border-color: var(--md-accent-fg-color);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.link-grid a {
+    text-decoration: none;
+    color: var(--md-default-fg-color);
+    font-weight: 500;
+    display: block;
+}
+
+.link-grid a:hover {
+    color: var(--md-accent-fg-color);
+}
+
+/* Code blocks */
+.highlight pre {
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+}
+
+/* Horizontal rules */
+hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--md-default-fg-color--lightest), transparent);
+    margin: 3rem 0;
+}
+
+/* Dark mode adjustments */
+[data-md-color-scheme="slate"] .product-card,
+[data-md-color-scheme="slate"] .link-grid li {
+    background: var(--md-code-bg-color);
+    border-color: var(--md-default-fg-color--lighter);
+}
+
+[data-md-color-scheme="slate"] .product-card:hover,
+[data-md-color-scheme="slate"] .link-grid li:hover {
+    background: var(--md-default-bg-color);
+    border-color: var(--md-accent-fg-color);
+}
+
+/* Responsive adjustments */
+@media screen and (max-width: 768px) {
+    .product-grid {
+        grid-template-columns: 1fr;
+        gap: 1.25rem;
+    }
+    
+    .link-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .product-card {
+        padding: 1.5rem;
+    }
+}
+
+/* Cross-references between products */
+a[href^="/cli/"],
+a[href^="/a2a-security/"] {
+    position: relative;
+}
+
+a[href^="/cli/"]::after,
+a[href^="/a2a-security/"]::after {
+    content: "→";
+    margin-left: 0.25em;
+    color: var(--md-accent-fg-color);
+}

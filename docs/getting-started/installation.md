@@ -1,3 +1,9 @@
+---
+title: Installation - A2A Security Documentation
+description: Install A2A Security Python middleware for runtime agent protection. Supports Python 3.10+ on Linux, macOS, and Windows with pip or Poetry.
+keywords: A2A Security installation, Python middleware, agent protection, pip install, Poetry, runtime security
+---
+
 # Installation
 
 ## Requirements

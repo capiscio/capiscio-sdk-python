@@ -470,20 +470,15 @@ config.upstream.test_endpoints = False
 
 CapiscIO A2A Security is **one layer** of security:
 
-```
-┌─────────────────────────────────┐
-│   Network Security (Firewall)   │
-├─────────────────────────────────┤
-│   TLS/HTTPS Encryption          │
-├─────────────────────────────────┤
-│   Authentication/Authorization  │
-├─────────────────────────────────┤
-│   CapiscIO A2A Security ← HERE  │
-├─────────────────────────────────┤
-│   Your Agent Logic              │
-├─────────────────────────────────┤
-│   Data Validation               │
-└─────────────────────────────────┘
+```mermaid
+graph TB
+    A[Network Security<br/>Firewall] --> B[TLS/HTTPS Encryption]
+    B --> C[Authentication/Authorization]
+    C --> D[CapiscIO A2A Security<br/>⭐ Protocol Validation]
+    D --> E[Your Agent Logic]
+    E --> F[Data Validation]
+    
+    style D fill:#4db6ac,stroke:#00695c,stroke-width:3px,color:#fff
 ```
 
 **Recommendation:** Use CapiscIO A2A Security **in addition to** other security measures, not as a replacement.
@@ -493,6 +488,5 @@ CapiscIO A2A Security is **one layer** of security:
 Now that you understand the core concepts:
 
 1. [Configure for your needs](../guides/configuration.md)
-2. [Learn about each validator](../guides/validation.md)
+2. [Learn about the scoring system](../guides/scoring.md)
 3. See real examples in the [Quick Start Guide](quickstart.md)
-4. [Production best practices](../guides/security-best-practices.md)

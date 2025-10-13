@@ -194,7 +194,6 @@ Include:
 - Be respectful and inclusive
 - Provide constructive feedback
 - Help others learn
-- Follow the [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## Questions?
 
