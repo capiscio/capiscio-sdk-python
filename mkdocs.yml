@@ -127,10 +127,6 @@ plugins:
             merge_init_into_class: true
             filters: ["!^_"]
 
-  - git-revision-date-localized:
-      enable_creation_date: true
-      type: timeago
-
 # Markdown extensions
 markdown_extensions:
   # Python Markdown
