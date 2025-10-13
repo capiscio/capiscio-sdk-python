@@ -342,7 +342,7 @@ def is_production_ready(result: ValidationResult) -> bool:
 
     Understand the validation architecture and security model.
 
-    [:octicons-arrow-right-24: Learn Concepts](../getting-started/concepts/)
+    [:octicons-arrow-right-24: Learn Concepts](../getting-started/concepts.md)
 
 -   **⚡ Quick Start**
 
@@ -350,7 +350,7 @@ def is_production_ready(result: ValidationResult) -> bool:
 
     Get started with A2A Security in 5 minutes.
 
-    [:octicons-arrow-right-24: Quick Start](../getting-started/quickstart/)
+    [:octicons-arrow-right-24: Quick Start](../getting-started/quickstart.md)
 
 </div>
 

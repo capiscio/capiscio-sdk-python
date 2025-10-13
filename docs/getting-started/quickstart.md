@@ -284,8 +284,6 @@ logger = logging.getLogger("capiscio_a2a_security")
 - [Core Concepts](concepts.md) - Understand how validation works
 - [Scoring System](../guides/scoring.md) - Learn about three-dimensional scoring
 - [Configuration Guide](../guides/configuration.md) - All configuration options explained
-- [Changelog](../changelog.md) - See version history
-- [Contributing](../contributing.md) - Contribute to the project
 
 ### Coming Soon
 

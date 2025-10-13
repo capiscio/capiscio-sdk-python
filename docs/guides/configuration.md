@@ -800,4 +800,3 @@ config.upstream.cache_validation = False
 - **[Scoring System](scoring.md)** - Understand validation scores
 - **[Quick Start](../getting-started/quickstart.md)** - Get started quickly
 - **[Core Concepts](../getting-started/concepts.md)** - Learn key concepts
-- **[Contributing](../contributing.md)** - Contribute to the project
