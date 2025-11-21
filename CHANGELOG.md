@@ -83,7 +83,7 @@ This is an **early 0.1.0 release**. While the middleware has comprehensive test 
 
 ### Installation
 ```bash
-pip install capiscio-a2a-security==0.1.0
+pip install capiscio-sdk==0.1.0
 ```
 
 ---
@@ -108,5 +108,5 @@ pip install capiscio-a2a-security==0.1.0
 
 ---
 
-[0.1.0]: https://github.com/capiscio/a2a-security/releases/tag/v0.1.0
+[0.1.0]: https://github.com/capiscio/capiscio-sdk-python/releases/tag/v0.1.0
 

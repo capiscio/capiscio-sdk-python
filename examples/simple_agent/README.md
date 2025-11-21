@@ -21,7 +21,7 @@ This example demonstrates how to build a complete A2A agent with CapiscIO Securi
 
 ```bash
 # Make sure you have the packages installed
-pip install capiscio-a2a-security a2a-sdk
+pip install capiscio-sdk a2a-sdk
 ```
 
 ## Running the Example
@@ -139,6 +139,6 @@ echo $?  # Should be 0 if all tests pass
 
 ## Learn More
 
-- [CapiscIO A2A Security Documentation](https://docs.capisc.io/a2a-security/)
-- [Configuration Guide](https://docs.capisc.io/a2a-security/guides/configuration/)
+- [CapiscIO A2A Security Documentation](https://docs.capisc.io/capiscio-sdk-python/)
+- [Configuration Guide](https://docs.capisc.io/capiscio-sdk-python/guides/configuration/)
 - [A2A Protocol Specification](https://a2a-protocol.org)

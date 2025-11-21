@@ -36,7 +36,7 @@ When using CapiscIO A2A Security:
 
 1. **Keep dependencies updated**
    ```bash
-   pip install --upgrade capiscio-a2a-security
+   pip install --upgrade capiscio-sdk
    ```
 
 2. **Use signature verification**

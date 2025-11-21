@@ -1,7 +1,7 @@
 # Requirements for the simple secured agent example
 
 # Core dependencies
-capiscio-a2a-security>=0.1.0
+capiscio-sdk>=0.1.0
 a2a-sdk[http-server]>=0.1.0
 
 # HTTP client for testing

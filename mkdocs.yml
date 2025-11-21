@@ -7,8 +7,8 @@ site_description: Runtime security middleware for A2A (Agent-to-Agent) protocol 
 site_author: CapiscIO Team
 copyright: Copyright &copy; 2025 CapiscIO
 
-repo_name: a2a-security
-repo_url: https://github.com/capiscio/a2a-security
+repo_name: capiscio-sdk-python
+repo_url: https://github.com/capiscio/capiscio-sdk-python
 edit_uri: edit/main/docs/
 
 theme:
@@ -190,7 +190,7 @@ extra:
       link: https://github.com/capiscio
       name: CapiscIO on GitHub
     - icon: fontawesome/brands/python
-      link: https://pypi.org/project/capiscio-a2a-security/
+      link: https://pypi.org/project/capiscio-sdk/
       name: CapiscIO A2A Security on PyPI
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/capiscio
@@ -215,7 +215,7 @@ extra:
           data: 0
           note: >-
             Thanks for your feedback! Help us improve by
-            <a href="https://github.com/capiscio/a2a-security/issues/new" target="_blank" rel="noopener">opening an issue</a>.
+            <a href="https://github.com/capiscio/capiscio-sdk-python/issues/new" target="_blank" rel="noopener">opening an issue</a>.
   
   consent:
     title: Cookie consent

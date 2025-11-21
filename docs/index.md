@@ -136,7 +136,7 @@ class MyAgentExecutor(AgentExecutor):
 ### 🚀 Fast to Integrate
 
 ```python
-pip install capiscio-a2a-security
+pip install capiscio-sdk
 ```
 
 One line of code, instant protection. No complex setup, no infrastructure changes.
@@ -287,10 +287,10 @@ graph LR
 ## Support & Community
 
 - 📖 [Full Documentation](getting-started/installation.md)
-- 🐛 [Report Issues](https://github.com/capiscio/a2a-security/issues)
-- 💬 [Discussions](https://github.com/capiscio/a2a-security/discussions)
-- 📦 [PyPI Package](https://pypi.org/project/capiscio-a2a-security/)
+- 🐛 [Report Issues](https://github.com/capiscio/capiscio-sdk-python/issues)
+- 💬 [Discussions](https://github.com/capiscio/capiscio-sdk-python/discussions)
+- 📦 [PyPI Package](https://pypi.org/project/capiscio-sdk/)
 
 ## License
 
-CapiscIO A2A Security is open source under the [Apache 2.0 License](https://github.com/capiscio/a2a-security/blob/main/LICENSE).
+CapiscIO A2A Security is open source under the [Apache 2.0 License](https://github.com/capiscio/capiscio-sdk-python/blob/main/LICENSE).

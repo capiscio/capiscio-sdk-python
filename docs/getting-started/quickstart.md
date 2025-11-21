@@ -46,7 +46,7 @@ secured_agent = secure(MyAgentExecutor())
 ## Installation
 
 ```bash
-pip install capiscio-a2a-security
+pip install capiscio-sdk
 ```
 
 ## Minimal Integration (1 Line of Code)
@@ -342,6 +342,6 @@ Additional guides and examples are being developed:
 ## Getting Help
 
 - 📖 [Full Documentation](../index.md)
-- 🐛 [Report Issues](https://github.com/capiscio/a2a-security/issues)
-- 💬 [Ask Questions](https://github.com/capiscio/a2a-security/discussions)
-- 📦 [View on PyPI](https://pypi.org/project/capiscio-a2a-security/)
+- 🐛 [Report Issues](https://github.com/capiscio/capiscio-sdk-python/issues)
+- 💬 [Ask Questions](https://github.com/capiscio/capiscio-sdk-python/discussions)
+- 📦 [View on PyPI](https://pypi.org/project/capiscio-sdk/)

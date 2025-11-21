@@ -17,7 +17,7 @@ keywords: A2A Security installation, Python middleware, agent protection, pip in
 The simplest way to install CapiscIO A2A Security is from PyPI:
 
 ```bash
-pip install capiscio-a2a-security
+pip install capiscio-sdk
 ```
 
 This installs the package and all required dependencies:
@@ -34,8 +34,8 @@ This installs the package and all required dependencies:
 To install the latest development version:
 
 ```bash
-git clone https://github.com/capiscio/a2a-security.git
-cd a2a-security
+git clone https://github.com/capiscio/capiscio-sdk-python.git
+cd capiscio-sdk-python
 pip install -e ".[dev]"
 ```
 
@@ -82,7 +82,7 @@ print("✅ All validators available!")
 For production monitoring and observability:
 
 ```bash
-pip install capiscio-a2a-security[monitoring]
+pip install capiscio-sdk[monitoring]
 ```
 
 This adds:
@@ -95,7 +95,7 @@ This adds:
 To build documentation locally:
 
 ```bash
-pip install capiscio-a2a-security[docs]
+pip install capiscio-sdk[docs]
 ```
 
 This adds:
@@ -119,7 +119,7 @@ source .venv/bin/activate
 .venv\Scripts\activate
 
 # Install package
-pip install capiscio-a2a-security
+pip install capiscio-sdk
 ```
 
 ## Docker
@@ -135,8 +135,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install capiscio-a2a-security
-RUN pip install --no-cache-dir capiscio-a2a-security
+# Install capiscio-sdk
+RUN pip install --no-cache-dir capiscio-sdk
 
 COPY . .
 
@@ -169,7 +169,7 @@ If you encounter dependency conflicts:
 pip check
 
 # Reinstall with --force-reinstall
-pip install --force-reinstall capiscio-a2a-security
+pip install --force-reinstall capiscio-sdk
 ```
 
 ### Version Issues
@@ -177,13 +177,13 @@ pip install --force-reinstall capiscio-a2a-security
 To upgrade to the latest version:
 
 ```bash
-pip install --upgrade capiscio-a2a-security
+pip install --upgrade capiscio-sdk
 ```
 
 To install a specific version:
 
 ```bash
-pip install capiscio-a2a-security==1.0.0
+pip install capiscio-sdk==1.0.0
 ```
 
 ## Next Steps
@@ -198,5 +198,5 @@ Now that you have CapiscIO A2A Security installed:
 
 If you encounter installation issues:
 
--  [Report an Issue](https://github.com/capiscio/a2a-security/issues)
-- 💬 [Ask in Discussions](https://github.com/capiscio/a2a-security/discussions)
+-  [Report an Issue](https://github.com/capiscio/capiscio-sdk-python/issues)
+- 💬 [Ask in Discussions](https://github.com/capiscio/capiscio-sdk-python/discussions)

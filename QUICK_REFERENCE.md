@@ -3,7 +3,7 @@
 ## Installation
 
 ```bash
-pip install capiscio-a2a-security
+pip install capiscio-sdk
 ```
 
 ## One-Line Integration
@@ -175,7 +175,7 @@ agent = secure(MyAgentExecutor(), config)
 
 ## Links
 
-- [Full Documentation](https://docs.capisc.io/a2a-security)
-- [GitHub](https://github.com/capiscio/a2a-security)
-- [PyPI](https://pypi.org/project/capiscio-a2a-security/)
-- [Report Issues](https://github.com/capiscio/a2a-security/issues)
+- [Full Documentation](https://docs.capisc.io/capiscio-sdk-python)
+- [GitHub](https://github.com/capiscio/capiscio-sdk-python)
+- [PyPI](https://pypi.org/project/capiscio-sdk/)
+- [Report Issues](https://github.com/capiscio/capiscio-sdk-python/issues)
