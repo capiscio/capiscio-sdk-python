@@ -1,1 +1,1 @@
-"""Tests for capiscio_a2a_security."""
+"""Tests for capiscio_sdk."""

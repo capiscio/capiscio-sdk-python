@@ -20,7 +20,7 @@ A2A Security uses a three-dimensional scoring system to evaluate agent cards:
 ### Accessing Scores
 
 ```python
-from capiscio_a2a_security import secure, SecurityConfig
+from capiscio_sdk import secure, SecurityConfig
 
 # Wrap your agent with security
 agent = secure(MyAgentExecutor(), SecurityConfig.production())
@@ -34,7 +34,7 @@ print(f"Trust: {result.trust.total}/100")
 print(f"Availability: {result.availability.total or 'Not tested'}")
 
 # Use rating enums for decisions
-from capiscio_a2a_security.types import TrustRating, ComplianceRating
+from capiscio_sdk.types import TrustRating, ComplianceRating
 
 if result.trust.rating == TrustRating.HIGHLY_TRUSTED:
     print("✅ Cryptographically verified agent")
@@ -291,7 +291,7 @@ The old `result.score` property still exists but returns `compliance.total` and 
 For type hints and IDE support:
 
 ```python
-from capiscio_a2a_security.types import (
+from capiscio_sdk.types import (
     ValidationResult,
     ComplianceScore,
     TrustScore,

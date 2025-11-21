@@ -1,5 +1,5 @@
 """Tests for core types."""
-from capiscio_a2a_security.types import (
+from capiscio_sdk.types import (
     ValidationSeverity,
     ValidationIssue,
     ValidationResult,

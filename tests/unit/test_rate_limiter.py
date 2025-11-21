@@ -1,8 +1,8 @@
 """Tests for rate limiter."""
 import pytest
 import time
-from capiscio_a2a_security.infrastructure.rate_limiter import RateLimiter
-from capiscio_a2a_security.errors import CapiscioRateLimitError
+from capiscio_sdk.infrastructure.rate_limiter import RateLimiter
+from capiscio_sdk.errors import CapiscioRateLimitError
 
 
 @pytest.fixture

@@ -16,8 +16,8 @@ from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.types import Message, TextPart, FilePart, DataPart, Role, MessageSendParams, FileWithBytes, FileWithUri
 from a2a.utils import new_agent_text_message
-from capiscio_a2a_security import secure, SecurityConfig
-from capiscio_a2a_security.errors import CapiscioValidationError, CapiscioRateLimitError
+from capiscio_sdk import secure, SecurityConfig
+from capiscio_sdk.errors import CapiscioValidationError, CapiscioRateLimitError
 
 
 class SimpleTestAgent:

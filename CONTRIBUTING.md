@@ -53,7 +53,7 @@ git checkout -b fix/your-bug-fix
 pytest
 
 # Run with coverage
-pytest --cov=capiscio_a2a_security --cov-report=html
+pytest --cov=capiscio_sdk --cov-report=html
 
 # Run specific test file
 pytest tests/unit/test_config.py
@@ -69,7 +69,7 @@ black .
 ruff check .
 
 # Type checking
-mypy capiscio_a2a_security
+mypy capiscio_sdk
 ```
 
 ### 5. Commit Changes

@@ -1,6 +1,6 @@
 """Tests for semver validator."""
 import pytest
-from capiscio_a2a_security.validators.semver import SemverValidator
+from capiscio_sdk.validators.semver import SemverValidator
 
 
 @pytest.fixture

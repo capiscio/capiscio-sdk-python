@@ -9,7 +9,7 @@ pip install capiscio-a2a-security
 ## One-Line Integration
 
 ```python
-from capiscio_a2a_security import secure
+from capiscio_sdk import secure
 
 agent = secure(MyAgentExecutor())
 ```
@@ -17,7 +17,7 @@ agent = secure(MyAgentExecutor())
 ## Configuration Presets
 
 ```python
-from capiscio_a2a_security import SecurityConfig
+from capiscio_sdk import SecurityConfig
 
 # Development (permissive)
 SecurityConfig.development()
@@ -101,7 +101,7 @@ config.timeout_ms = 5000
 ## Error Handling
 
 ```python
-from capiscio_a2a_security.errors import (
+from capiscio_sdk.errors import (
     CapiscIOValidationError,
     CapiscIOSignatureError,
     CapiscIORateLimitError,
@@ -142,7 +142,7 @@ export CAPISCIO_TIMEOUT_MS=5000
 import logging
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("capiscio_a2a_security")
+logger = logging.getLogger("capiscio_sdk")
 ```
 
 ## Common Use Cases

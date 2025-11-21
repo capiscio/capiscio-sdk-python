@@ -83,7 +83,7 @@ If not using trusted publishing, you'll need a PyPI API token:
 2. **Test installation**:
    ```bash
    pip install capiscio-a2a-security==0.2.0
-   python -c "import capiscio_a2a_security; print('✓ Works!')"
+   python -c "import capiscio_sdk; print('✓ Works!')"
    ```
 3. **Check GitHub Release**: https://github.com/capiscio/a2a-security/releases
 

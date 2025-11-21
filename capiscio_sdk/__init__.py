@@ -1,10 +1,10 @@
-"""Capiscio A2A Security - Runtime security middleware for A2A agents.
+"""Capiscio SDK - Runtime security middleware for A2A agents.
 
 This package provides always-on protection for A2A protocol agents through
 validation, signature verification, and protocol compliance checking.
 
 Example:
-    >>> from capiscio_a2a_security import secure
+    >>> from capiscio_sdk import secure
     >>> agent = secure(MyAgentExecutor())
 """
 

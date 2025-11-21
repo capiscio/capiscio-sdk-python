@@ -86,32 +86,32 @@ jobs:
           files: dist/*
           generate_release_notes: true
           body: |
-            # CapiscIO A2A Security ${{ steps.get_version.outputs.VERSION }}
+            # CapiscIO SDK ${{ steps.get_version.outputs.VERSION }}
             
             ## Installation
             
             ```bash
-            pip install capiscio-a2a-security==${{ steps.get_version.outputs.VERSION }}
+            pip install capiscio-sdk==${{ steps.get_version.outputs.VERSION }}
             ```
             
             Or upgrade:
             
             ```bash
-            pip install --upgrade capiscio-a2a-security
+            pip install --upgrade capiscio-sdk
             ```
             
             ## What's Changed
             
-            See [CHANGELOG.md](https://github.com/capiscio/a2a-security/blob/main/CHANGELOG.md) for detailed changes.
+            See [CHANGELOG.md](https://github.com/capiscio/capiscio-sdk-python/blob/main/CHANGELOG.md) for detailed changes.
             
             ## Documentation
             
-            - [Getting Started](https://docs.capisc.io/a2a-security/getting-started/quickstart/)
-            - [Configuration Guide](https://docs.capisc.io/a2a-security/guides/configuration/)
-            - [API Reference](https://docs.capisc.io/a2a-security/api/)
+            - [Getting Started](https://docs.capisc.io/sdk-python/getting-started/quickstart/)
+            - [Configuration Guide](https://docs.capisc.io/sdk-python/guides/configuration/)
+            - [API Reference](https://docs.capisc.io/sdk-python/api/)
             
             ---
             
-            **Full Changelog**: https://github.com/capiscio/a2a-security/compare/${{ github.event.before }}...${{ github.ref_name }}
+            **Full Changelog**: https://github.com/capiscio/capiscio-sdk-python/compare/${{ github.event.before }}...${{ github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

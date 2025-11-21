@@ -1,5 +1,5 @@
 """Tests for configuration."""
-from capiscio_a2a_security.config import (
+from capiscio_sdk.config import (
     SecurityConfig,
     DownstreamConfig,
     UpstreamConfig,

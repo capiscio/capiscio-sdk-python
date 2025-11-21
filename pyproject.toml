@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "capiscio-a2a-security"
+name = "capiscio-sdk"
 version = "0.1.0"
 description = "Runtime security middleware for A2A agents"
 readme = "README.md"
@@ -48,12 +48,12 @@ dev = [
 
 [project.urls]
 Homepage = "https://capisc.io"
-Documentation = "https://docs.capisc.io/a2a-security"
-Repository = "https://github.com/capiscio/a2a-security"
-Issues = "https://github.com/capiscio/a2a-security/issues"
+Documentation = "https://docs.capisc.io/sdk-python"
+Repository = "https://github.com/capiscio/capiscio-sdk-python"
+Issues = "https://github.com/capiscio/capiscio-sdk-python/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["capiscio_a2a_security"]
+packages = ["capiscio_sdk"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

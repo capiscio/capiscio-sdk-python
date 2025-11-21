@@ -1,6 +1,6 @@
 """Tests for signature validator."""
 import pytest
-from capiscio_a2a_security.validators.signature import SignatureValidator
+from capiscio_sdk.validators.signature import SignatureValidator
 
 
 @pytest.fixture

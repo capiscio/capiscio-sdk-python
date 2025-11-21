@@ -41,12 +41,12 @@ jobs:
       
       - name: Run type checking (mypy)
         run: |
-          mypy capiscio_a2a_security
+          mypy capiscio_sdk
         continue-on-error: true
       
       - name: Run unit tests
         run: |
-          pytest tests/unit/ -v --tb=short --cov=capiscio_a2a_security --cov-report=xml --cov-report=term
+          pytest tests/unit/ -v --tb=short --cov=capiscio_sdk --cov-report=xml --cov-report=term
       
       - name: Run integration tests
         run: |
@@ -88,7 +88,7 @@ jobs:
       
       - name: Run bandit security scan
         run: |
-          bandit -r capiscio_a2a_security -f json -o bandit-report.json || true
+          bandit -r capiscio_sdk -f json -o bandit-report.json || true
         continue-on-error: true
       
       - name: Upload bandit report

@@ -9,8 +9,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 
-from capiscio_a2a_security.validators.certificate import CertificateValidator
-from capiscio_a2a_security.types import ValidationSeverity
+from capiscio_sdk.validators.certificate import CertificateValidator
+from capiscio_sdk.types import ValidationSeverity
 
 
 @pytest.fixture

@@ -286,4 +286,4 @@ extra_javascript:
 
 # Watch for changes
 watch:
-  - capiscio_a2a_security
+  - capiscio_sdk

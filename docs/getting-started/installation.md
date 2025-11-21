@@ -53,16 +53,16 @@ The `[dev]` extra installs development dependencies including:
 Verify the installation by importing the package:
 
 ```python
-import capiscio_a2a_security
+import capiscio_sdk
 
-print(capiscio_a2a_security.__version__)
+print(capiscio_sdk.__version__)
 # Output: 1.0.0
 ```
 
 Or check available validators:
 
 ```python
-from capiscio_a2a_security import (
+from capiscio_sdk import (
     MessageValidator,
     ProtocolValidator,
     SignatureValidator,
@@ -150,7 +150,7 @@ CMD ["python", "main.py"]
 If you see import errors after installation:
 
 ```python
-ModuleNotFoundError: No module named 'capiscio_a2a_security'
+ModuleNotFoundError: No module named 'capiscio_sdk'
 ```
 
 **Solution:** Ensure you're in the correct virtual environment:

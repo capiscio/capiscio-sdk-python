@@ -4,8 +4,8 @@ import pytest
 from unittest.mock import AsyncMock, Mock
 import httpx
 
-from capiscio_a2a_security.validators.agent_card import AgentCardValidator
-from capiscio_a2a_security.types import ValidationSeverity
+from capiscio_sdk.validators.agent_card import AgentCardValidator
+from capiscio_sdk.types import ValidationSeverity
 
 
 @pytest.fixture
