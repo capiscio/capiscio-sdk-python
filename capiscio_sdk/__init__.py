@@ -8,7 +8,7 @@ Example:
     >>> agent = secure(MyAgentExecutor())
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 # Core exports
 from .executor import CapiscioSecurityExecutor, secure, secure_agent
