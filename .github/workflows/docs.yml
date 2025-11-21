@@ -41,6 +41,7 @@ jobs:
         with:
           use-quiet-mode: 'yes'
           folder-path: 'docs'
+          config-file: '.github/markdown-link-check-config.json'
         continue-on-error: true
       
       - name: Upload build artifact
