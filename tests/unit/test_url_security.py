@@ -1,6 +1,6 @@
 """Tests for URL security validator."""
 import pytest
-from capiscio_a2a_security.validators.url_security import URLSecurityValidator
+from capiscio_sdk.validators.url_security import URLSecurityValidator
 
 
 @pytest.fixture

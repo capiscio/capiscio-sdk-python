@@ -44,7 +44,7 @@ This guide covers all configuration options for CapiscIO A2A Security, including
 The easiest way to configure the security middleware is using one of the built-in presets:
 
 ```python
-from capiscio_a2a_security import secure, SecurityConfig
+from capiscio_sdk import secure, SecurityConfig
 
 # Development - Permissive, no rate limiting
 agent = secure(MyAgent(), SecurityConfig.development())
@@ -64,7 +64,7 @@ agent = secure(MyAgent(), SecurityConfig.from_env())
 For fine-grained control, create a custom configuration:
 
 ```python
-from capiscio_a2a_security import SecurityConfig, DownstreamConfig, UpstreamConfig
+from capiscio_sdk import SecurityConfig, DownstreamConfig, UpstreamConfig
 
 config = SecurityConfig(
     downstream=DownstreamConfig(

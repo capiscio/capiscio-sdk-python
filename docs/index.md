@@ -19,7 +19,7 @@ Your A2A agent communicates with other agents you don't control. **Any one of th
 One line of code gives you unilateral protection - **no peer cooperation required:**
 
 ```python
-from capiscio_a2a_security import secure
+from capiscio_sdk import secure
 
 # Before: Vulnerable to any malicious input
 agent = MyAgentExecutor()
@@ -101,11 +101,11 @@ Choose the pattern that fits your needs:
 
 ```python
 # Pattern 1: Minimal (one-liner with preset)
-from capiscio_a2a_security import secure, SecurityConfig
+from capiscio_sdk import secure, SecurityConfig
 agent = secure(MyAgentExecutor(), SecurityConfig.production())
 
 # Pattern 2: Granular Control
-from capiscio_a2a_security import CapiscIOSecurityExecutor, SecurityConfig
+from capiscio_sdk import CapiscIOSecurityExecutor, SecurityConfig
 
 config = SecurityConfig.production()
 # Customize exactly what you need
@@ -120,7 +120,7 @@ agent = CapiscIOSecurityExecutor(
 )
 
 # Pattern 3: Environment-Driven (12-factor app)
-from capiscio_a2a_security import secure_agent
+from capiscio_sdk import secure_agent
 
 @secure_agent(config=SecurityConfig.from_env())
 class MyAgentExecutor(AgentExecutor):
@@ -136,7 +136,7 @@ class MyAgentExecutor(AgentExecutor):
 ### 🚀 Fast to Integrate
 
 ```python
-pip install capiscio-a2a-security
+pip install capiscio-sdk
 ```
 
 One line of code, instant protection. No complex setup, no infrastructure changes.
@@ -166,7 +166,7 @@ Unlike protocol-level security that requires all participants to cooperate, Capi
 ## Quick Example
 
 ```python
-from capiscio_a2a_security import secure
+from capiscio_sdk import secure
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from my_agent import MyAgentExecutor
@@ -287,10 +287,10 @@ graph LR
 ## Support & Community
 
 - 📖 [Full Documentation](getting-started/installation.md)
-- 🐛 [Report Issues](https://github.com/capiscio/a2a-security/issues)
-- 💬 [Discussions](https://github.com/capiscio/a2a-security/discussions)
-- 📦 [PyPI Package](https://pypi.org/project/capiscio-a2a-security/)
+- 🐛 [Report Issues](https://github.com/capiscio/capiscio-sdk-python/issues)
+- 💬 [Discussions](https://github.com/capiscio/capiscio-sdk-python/discussions)
+- 📦 [PyPI Package](https://pypi.org/project/capiscio-sdk/)
 
 ## License
 
-CapiscIO A2A Security is open source under the [Apache 2.0 License](https://github.com/capiscio/a2a-security/blob/main/LICENSE).
+CapiscIO A2A Security is open source under the [Apache 2.0 License](https://github.com/capiscio/capiscio-sdk-python/blob/main/LICENSE).

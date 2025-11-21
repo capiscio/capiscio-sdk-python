@@ -184,12 +184,12 @@ hr {
 
 /* Cross-references between products */
 a[href^="/cli/"],
-a[href^="/a2a-security/"] {
+a[href^="/capiscio-sdk-python/"] {
     position: relative;
 }
 
 a[href^="/cli/"]::after,
-a[href^="/a2a-security/"]::after {
+a[href^="/capiscio-sdk-python/"]::after {
     content: "→";
     margin-left: 0.25em;
     color: var(--md-accent-fg-color);

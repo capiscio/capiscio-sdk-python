@@ -10,9 +10,9 @@ Setup trusted publishing on PyPI to avoid managing API tokens:
 
 1. Go to https://pypi.org/manage/account/publishing/
 2. Add a new "pending publisher":
-   - **PyPI Project Name:** `capiscio-a2a-security`
+   - **PyPI Project Name:** `capiscio-sdk`
    - **Owner:** `capiscio`
-   - **Repository:** `a2a-security`
+   - **Repository:** `capiscio-sdk-python`
    - **Workflow:** `publish.yml`
    - **Environment:** (leave empty)
 
@@ -79,13 +79,13 @@ If not using trusted publishing, you'll need a PyPI API token:
 
 ### Step 3: Verify Release
 
-1. **Check PyPI**: https://pypi.org/project/capiscio-a2a-security/
+1. **Check PyPI**: https://pypi.org/project/capiscio-sdk/
 2. **Test installation**:
    ```bash
-   pip install capiscio-a2a-security==0.2.0
-   python -c "import capiscio_a2a_security; print('✓ Works!')"
+   pip install capiscio-sdk==0.2.0
+   python -c "import capiscio_sdk; print('✓ Works!')"
    ```
-3. **Check GitHub Release**: https://github.com/capiscio/a2a-security/releases
+3. **Check GitHub Release**: https://github.com/capiscio/capiscio-sdk-python/releases
 
 ## Manual Release (If Automated Fails)
 
@@ -106,7 +106,7 @@ python -m twine upload dist/*
 # Enter your PyPI username and API token when prompted
 
 # 5. Create GitHub release manually
-# Go to: https://github.com/capiscio/a2a-security/releases/new
+# Go to: https://github.com/capiscio/capiscio-sdk-python/releases/new
 # - Tag: v0.2.0
 # - Title: Release v0.2.0
 # - Description: Copy from CHANGELOG.md
@@ -196,6 +196,6 @@ Before each release:
 
 ## Support
 
-- **Issues:** https://github.com/capiscio/a2a-security/issues
-- **Discussions:** https://github.com/capiscio/a2a-security/discussions
-- **PyPI:** https://pypi.org/project/capiscio-a2a-security/
+- **Issues:** https://github.com/capiscio/capiscio-sdk-python/issues
+- **Discussions:** https://github.com/capiscio/capiscio-sdk-python/discussions
+- **PyPI:** https://pypi.org/project/capiscio-sdk/

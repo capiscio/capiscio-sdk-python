@@ -13,8 +13,8 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ```bash
 # Clone the repository
-git clone https://github.com/capiscio/a2a-security.git
-cd a2a-security
+git clone https://github.com/capiscio/capiscio-sdk-python.git
+cd capiscio-sdk-python
 
 # Create virtual environment
 python -m venv .venv
@@ -53,7 +53,7 @@ git checkout -b fix/your-bug-fix
 pytest
 
 # Run with coverage
-pytest --cov=capiscio_a2a_security --cov-report=html
+pytest --cov=capiscio_sdk --cov-report=html
 
 # Run specific test file
 pytest tests/unit/test_config.py
@@ -69,7 +69,7 @@ black .
 ruff check .
 
 # Type checking
-mypy capiscio_a2a_security
+mypy capiscio_sdk
 ```
 
 ### 5. Commit Changes
@@ -197,8 +197,8 @@ Include:
 
 ## Questions?
 
-- Open a [GitHub Discussion](https://github.com/capiscio/a2a-security/discussions)
-- Check existing [Issues](https://github.com/capiscio/a2a-security/issues)
+- Open a [GitHub Discussion](https://github.com/capiscio/capiscio-sdk-python/discussions)
+- Check existing [Issues](https://github.com/capiscio/capiscio-sdk-python/issues)
 - Visit [capisc.io](https://capisc.io)
 
 Thank you for contributing! 🎉

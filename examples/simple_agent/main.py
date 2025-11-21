@@ -16,7 +16,7 @@ Usage:
 
 import asyncio
 from a2a.server.server import A2AServer
-from capiscio_a2a_security import secure, SecurityConfig
+from capiscio_sdk import secure, SecurityConfig
 from agent_executor import SimpleAgentExecutor
 
 

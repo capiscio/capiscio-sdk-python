@@ -1,8 +1,8 @@
 """Tests for validation cache."""
 import pytest
 import time
-from capiscio_a2a_security.infrastructure.cache import ValidationCache
-from capiscio_a2a_security.types import ValidationResult
+from capiscio_sdk.infrastructure.cache import ValidationCache
+from capiscio_sdk.types import ValidationResult
 
 
 @pytest.fixture

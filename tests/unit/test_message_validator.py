@@ -1,6 +1,6 @@
 """Tests for message validator."""
 import pytest
-from capiscio_a2a_security.validators.message import MessageValidator
+from capiscio_sdk.validators.message import MessageValidator
 
 
 @pytest.fixture

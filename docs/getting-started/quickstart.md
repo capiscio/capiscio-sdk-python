@@ -21,7 +21,7 @@ class MyAgentExecutor(AgentExecutor):
 ### ✅ With Security (One Line)
 
 ```python
-from capiscio_a2a_security import secure
+from capiscio_sdk import secure
 
 # Same agent, now protected
 secured_agent = secure(MyAgentExecutor())
@@ -46,7 +46,7 @@ secured_agent = secure(MyAgentExecutor())
 ## Installation
 
 ```bash
-pip install capiscio-a2a-security
+pip install capiscio-sdk
 ```
 
 ## Minimal Integration (1 Line of Code)
@@ -55,7 +55,7 @@ pip install capiscio-a2a-security
 The fastest way to add security to your agent:
 
 ```python
-from capiscio_a2a_security import secure
+from capiscio_sdk import secure
 from my_agent import MyAgentExecutor
 
 # Wrap your agent with security (production defaults)
@@ -79,7 +79,7 @@ That's it! Your agent now has:
 Here's a complete working example with an A2A server:
 
 ```python
-from capiscio_a2a_security import secure
+from capiscio_sdk import secure
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 from a2a import AgentExecutor, RequestContext, EventQueue, Message
@@ -193,7 +193,7 @@ await secured_agent.execute(context, event_queue)
 ### Invalid Request ❌
 
 ```python
-from capiscio_a2a_security.errors import CapiscIOValidationError
+from capiscio_sdk.errors import CapiscIOValidationError
 
 try:
     # Missing required field (message_id)
@@ -222,7 +222,7 @@ The `secure()` function uses **production** defaults. You can choose different p
 📖 **For detailed configuration options, see the [Configuration Guide](../guides/configuration.md).**
 
 ```python
-from capiscio_a2a_security import secure, SecurityConfig
+from capiscio_sdk import secure, SecurityConfig
 
 # Development: Permissive, fast iteration
 agent = secure(MyAgentExecutor(), SecurityConfig.development())
@@ -269,7 +269,7 @@ Enable logging to see what's being validated:
 import logging
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("capiscio_a2a_security")
+logger = logging.getLogger("capiscio_sdk")
 
 # Now you'll see validation logs:
 # INFO - Message validation passed (compliance: 100, trust: 90)
@@ -308,7 +308,7 @@ Additional guides and examples are being developed:
     
     ```python
     from adk import ADKAgent
-    from capiscio_a2a_security import secure
+    from capiscio_sdk import secure
     
     adk_agent = ADKAgent(...)
     secured_agent = secure(adk_agent)
@@ -342,6 +342,6 @@ Additional guides and examples are being developed:
 ## Getting Help
 
 - 📖 [Full Documentation](../index.md)
-- 🐛 [Report Issues](https://github.com/capiscio/a2a-security/issues)
-- 💬 [Ask Questions](https://github.com/capiscio/a2a-security/discussions)
-- 📦 [View on PyPI](https://pypi.org/project/capiscio-a2a-security/)
+- 🐛 [Report Issues](https://github.com/capiscio/capiscio-sdk-python/issues)
+- 💬 [Ask Questions](https://github.com/capiscio/capiscio-sdk-python/discussions)
+- 📦 [View on PyPI](https://pypi.org/project/capiscio-sdk/)

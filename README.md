@@ -1,14 +1,14 @@
-# CapiscIO A2A Security
+# CapiscIO SDK (Python)
 
 **Runtime security middleware for A2A (Agent-to-Agent) protocol agents**
 
-[![PyPI version](https://badge.fury.io/py/capiscio-a2a-security.svg)](https://badge.fury.io/py/capiscio-a2a-security)
+[![PyPI version](https://badge.fury.io/py/capiscio-sdk.svg)](https://badge.fury.io/py/capiscio-sdk)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-## What is CapiscIO A2A Security?
+## What is CapiscIO SDK?
 
-CapiscIO A2A Security provides **always-on runtime protection** for agents using the [A2A (Agent-to-Agent) protocol](https://github.com/google/A2A). It wraps your agent executor to validate incoming requests, verify signatures, and protect against malicious actors—all without requiring peer cooperation.
+CapiscIO SDK provides **always-on runtime protection** for agents using the [A2A (Agent-to-Agent) protocol](https://github.com/google/A2A). It wraps your agent executor to validate incoming requests, verify signatures, and protect against malicious actors—all without requiring peer cooperation.
 
 ### Key Features
 
@@ -23,7 +23,7 @@ CapiscIO A2A Security provides **always-on runtime protection** for agents using
 ## Installation
 
 ```bash
-pip install capiscio-a2a-security
+pip install capiscio-sdk
 ```
 
 ## Quick Start
@@ -32,7 +32,7 @@ pip install capiscio-a2a-security
 ### Pattern 1: Minimal (One-liner with Preset)
 
 ```python
-from capiscio_a2a_security import secure, SecurityConfig
+from capiscio_sdk import secure, SecurityConfig
 from a2a.server.request_handlers import DefaultRequestHandler
 from a2a.server.tasks import InMemoryTaskStore
 
@@ -53,7 +53,7 @@ print(result.compliance.total, result.trust.total, result.availability.total)
 ### Pattern 2: Granular Control
 
 ```python
-from capiscio_a2a_security import CapiscIOSecurityExecutor, SecurityConfig
+from capiscio_sdk import CapiscIOSecurityExecutor, SecurityConfig
 
 # Start with a preset, customize what matters to you
 config = SecurityConfig.production()
@@ -71,7 +71,7 @@ secure_agent = CapiscIOSecurityExecutor(
 ### Pattern 3: Environment-Driven (12-Factor App)
 
 ```python
-from capiscio_a2a_security import secure_agent, SecurityConfig
+from capiscio_sdk import secure_agent, SecurityConfig
 from a2a import AgentExecutor, RequestContext, EventQueue
 
 @secure_agent(config=SecurityConfig.from_env())
@@ -84,7 +84,7 @@ class MyAgentExecutor(AgentExecutor):
 handler = DefaultRequestHandler(agent_executor=MyAgentExecutor())
 ```
 
-**All 16 configuration options documented in the [Configuration Guide](https://docs.capisc.io/a2a-security/guides/configuration/).**
+**All 16 configuration options documented in the [Configuration Guide](https://docs.capisc.io/sdk-python/guides/configuration/).**
 
 ## Why CapiscIO?
 
@@ -127,7 +127,7 @@ SecurityConfig.from_env()
 ### Custom Configuration
 
 ```python
-from capiscio_a2a_security import SecurityConfig, DownstreamConfig, UpstreamConfig
+from capiscio_sdk import SecurityConfig, DownstreamConfig, UpstreamConfig
 
 config = SecurityConfig(
     downstream=DownstreamConfig(
@@ -176,7 +176,7 @@ The [Agent-to-Agent (A2A) protocol](https://github.com/google/A2A) is an open st
 
 ## Support
 
-- **Issues:** [GitHub Issues](https://github.com/capiscio/a2a-security/issues)
-- **Discussions:** [GitHub Discussions](https://github.com/capiscio/a2a-security/discussions)
+- **Issues:** [GitHub Issues](https://github.com/capiscio/capiscio-sdk-python/issues)
+- **Discussions:** [GitHub Discussions](https://github.com/capiscio/capiscio-sdk-python/discussions)
 - **Documentation:** [docs.capisc.io](https://docs.capisc.io)
 - **Website:** [capisc.io](https://capisc.io)

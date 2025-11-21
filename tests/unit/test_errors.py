@@ -1,11 +1,11 @@
 """Tests for error types."""
-from capiscio_a2a_security.errors import (
+from capiscio_sdk.errors import (
     CapiscioSecurityError,
     CapiscioValidationError,
     CapiscioSignatureError,
     CapiscioRateLimitError,
 )
-from capiscio_a2a_security.types import (
+from capiscio_sdk.types import (
     ValidationResult,
     ValidationIssue,
     ValidationSeverity,

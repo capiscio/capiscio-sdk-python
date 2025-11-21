@@ -126,7 +126,7 @@ Validates agents **before** you call them.
 Every validation returns a `ValidationResult` with **three score dimensions**:
 
 ```python
-from capiscio_a2a_security.types import ValidationResult, ValidationIssue, ValidationSeverity
+from capiscio_sdk.types import ValidationResult, ValidationIssue, ValidationSeverity
 
 result = ValidationResult(
     success=True,              # Overall pass/fail
@@ -337,7 +337,7 @@ config.downstream.rate_limit_requests_per_minute = 60
 ### 1. Minimal (One-Liner)
 
 ```python
-from capiscio_a2a_security import secure
+from capiscio_sdk import secure
 
 agent = secure(MyAgentExecutor())
 ```
@@ -356,7 +356,7 @@ agent = secure(MyAgentExecutor())
 ### 2. Explicit Configuration
 
 ```python
-from capiscio_a2a_security import CapiscIOSecurityExecutor, SecurityConfig
+from capiscio_sdk import CapiscIOSecurityExecutor, SecurityConfig
 
 config = SecurityConfig.production()
 config.downstream.rate_limit_requests_per_minute = 100
@@ -382,7 +382,7 @@ agent = CapiscIOSecurityExecutor(
 ### 3. Decorator Pattern
 
 ```python
-from capiscio_a2a_security import secure_agent, SecurityConfig
+from capiscio_sdk import secure_agent, SecurityConfig
 
 @secure_agent(config=SecurityConfig.production())
 class MyAgentExecutor(AgentExecutor):

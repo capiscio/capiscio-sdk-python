@@ -114,8 +114,8 @@ These examples also serve as integration tests. See `tests/integration/` for aut
 
 ## More Resources
 
-- [CapiscIO A2A Security Documentation](https://docs.capisc.io/a2a-security/)
-- [Configuration Guide](https://docs.capisc.io/a2a-security/guides/configuration/)
+- [CapiscIO A2A Security Documentation](https://docs.capisc.io/capiscio-sdk-python/)
+- [Configuration Guide](https://docs.capisc.io/capiscio-sdk-python/guides/configuration/)
 - [A2A Protocol](https://a2a-protocol.org)
 - [A2A Samples Repository](https://github.com/a2aproject/a2a-samples)
 

@@ -6,13 +6,13 @@ These are temporarily skipped pending refactor.
 """
 import pytest
 from unittest.mock import Mock
-from capiscio_a2a_security.executor import (
+from capiscio_sdk.executor import (
     CapiscioSecurityExecutor,
     secure,
     secure_agent,
 )
-from capiscio_a2a_security.config import SecurityConfig
-from capiscio_a2a_security.errors import (
+from capiscio_sdk.config import SecurityConfig
+from capiscio_sdk.errors import (
     CapiscioValidationError,
     CapiscioRateLimitError,
 )
