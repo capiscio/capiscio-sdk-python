@@ -32,7 +32,7 @@ Include:
 
 ## Security Best Practices
 
-When using CapiscIO A2A Security:
+When using the CapiscIO Python SDK:
 
 1. **Keep dependencies updated**
    ```bash

@@ -1,6 +1,6 @@
-# CapiscIO A2A Security Examples
+# CapiscIO Python SDK Examples
 
-This directory contains complete, runnable examples demonstrating how to integrate CapiscIO A2A Security with real A2A agents.
+This directory contains complete, runnable examples demonstrating how to integrate the CapiscIO Python SDK with real A2A agents.
 
 ## 🚀 Quick Start: Simple Secured Agent
 
@@ -114,7 +114,7 @@ These examples also serve as integration tests. See `tests/integration/` for aut
 
 ## More Resources
 
-- [CapiscIO A2A Security Documentation](https://docs.capisc.io/capiscio-sdk-python/)
+- [CapiscIO Python SDK Documentation](https://docs.capisc.io/capiscio-sdk-python/)
 - [Configuration Guide](https://docs.capisc.io/capiscio-sdk-python/guides/configuration/)
 - [A2A Protocol](https://a2a-protocol.org)
 - [A2A Samples Repository](https://github.com/a2aproject/a2a-samples)

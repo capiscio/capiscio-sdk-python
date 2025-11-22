@@ -1,4 +1,4 @@
-// Custom JavaScript for Capiscio A2A Security documentation
+// Custom JavaScript for Capiscio Python SDK documentation
 
 document.addEventListener('DOMContentLoaded', function() {
   // Add copy success feedback

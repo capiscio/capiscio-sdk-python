@@ -1,7 +1,7 @@
 """
 Simple A2A Agent with CapiscIO Security
 
-This is a complete, runnable example showing how to integrate CapiscIO A2A Security
+This is a complete, runnable example showing how to integrate the CapiscIO Python SDK
 with a real A2A agent. This agent responds to greetings and demonstrates all
 security features.
 """
@@ -23,7 +23,7 @@ class SimpleAgent:
         elif "help" in message_lower:
             return "I can respond to greetings and demonstrate security features. Try saying 'hello'!"
         elif "security" in message_lower:
-            return "I'm protected by CapiscIO A2A Security, which validates all requests and prevents attacks!"
+            return "I'm protected by the CapiscIO Python SDK, which validates all requests and prevents attacks!"
         else:
             return f"You said: {message}. I'm a simple demo agent protected by security middleware."
 

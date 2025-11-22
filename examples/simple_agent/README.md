@@ -1,6 +1,6 @@
 # Simple Secured A2A Agent Example
 
-This example demonstrates how to build a complete A2A agent with CapiscIO Security integrated.
+This example demonstrates how to build a complete A2A agent with the CapiscIO Python SDK integrated.
 
 ## What This Example Shows
 
@@ -36,7 +36,7 @@ python main.py
 You should see:
 
 ```
-🛡️  Starting Simple A2A Agent with CapiscIO Security
+🛡️  Starting Simple A2A Agent with CapiscIO Python SDK
 ============================================================
 Security Features Enabled:
   ✅ Message validation
@@ -139,6 +139,6 @@ echo $?  # Should be 0 if all tests pass
 
 ## Learn More
 
-- [CapiscIO A2A Security Documentation](https://docs.capisc.io/capiscio-sdk-python/)
+- [CapiscIO Python SDK Documentation](https://docs.capisc.io/capiscio-sdk-python/)
 - [Configuration Guide](https://docs.capisc.io/capiscio-sdk-python/guides/configuration/)
 - [A2A Protocol Specification](https://a2a-protocol.org)

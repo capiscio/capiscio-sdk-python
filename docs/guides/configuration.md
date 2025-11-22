@@ -1,12 +1,12 @@
 ---
-title: Configuration Guide - A2A Security Documentation
-description: Complete configuration guide for A2A Security including presets, fail modes, rate limiting, and environment variables for production deployment.
-keywords: A2A Security config, SecurityConfig, fail modes, rate limiting, upstream protection, downstream protection, environment variables
+title: Configuration Guide - CapiscIO Python SDK Documentation
+description: Complete configuration guide for CapiscIO Python SDK including presets, fail modes, rate limiting, and environment variables for production deployment.
+keywords: CapiscIO Python SDK config, SecurityConfig, fail modes, rate limiting, upstream protection, downstream protection, environment variables
 ---
 
 # Configuration Guide
 
-This guide covers all configuration options for CapiscIO A2A Security, including upstream and downstream protection settings, fail modes, rate limiting, and environment variables.
+This guide covers all configuration options for the CapiscIO Python SDK, including upstream and downstream protection settings, fail modes, rate limiting, and environment variables.
 
 ---
 

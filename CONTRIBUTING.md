@@ -1,4 +1,4 @@
-# Contributing to CapiscIO A2A Security
+# Contributing to CapiscIO Python SDK
 
 Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
 

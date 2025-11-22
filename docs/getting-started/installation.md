@@ -14,7 +14,7 @@ keywords: A2A Security installation, Python middleware, agent protection, pip in
 
 ## Install from PyPI
 
-The simplest way to install CapiscIO A2A Security is from PyPI:
+The simplest way to install the CapiscIO Python SDK is from PyPI:
 
 ```bash
 pip install capiscio-sdk
@@ -188,7 +188,7 @@ pip install capiscio-sdk==1.0.0
 
 ## Next Steps
 
-Now that you have CapiscIO A2A Security installed:
+Now that you have the CapiscIO Python SDK installed:
 
 1. [Quick Start Guide](quickstart.md) - Integrate security in 5 minutes
 2. [Core Concepts](concepts.md) - Understand how validation works

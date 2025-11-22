@@ -1,4 +1,4 @@
-# CapiscIO A2A Security
+# CapiscIO Python SDK
 
 **Runtime security middleware for A2A (Agent-to-Agent) protocol agents**
 
@@ -62,9 +62,9 @@ That's it. Your agent now validates everything, blocks attacks, and gives you co
 
 </div>
 
-## What is CapiscIO A2A Security?
+## What is CapiscIO Python SDK?
 
-CapiscIO A2A Security provides **runtime protection** for agents using the [A2A (Agent-to-Agent) protocol](https://github.com/google/A2A). It acts as middleware that validates all agent communication, protecting you from:
+The CapiscIO Python SDK provides **runtime protection** for agents using the [A2A (Agent-to-Agent) protocol](https://github.com/google/A2A). It acts as middleware that validates all agent communication, protecting you from:
 
 - 🚫 **Malformed messages** - Schema and structure violations
 - ⚠️ **Protocol violations** - Invalid state transitions, bad headers
@@ -131,7 +131,7 @@ class MyAgentExecutor(AgentExecutor):
 
 **Start with a preset, customize what matters to you.** All 16 configuration options documented in the [Configuration Guide](guides/configuration.md).
 
-## Why CapiscIO A2A Security?
+## Why CapiscIO Python SDK?
 
 ### 🚀 Fast to Integrate
 
@@ -161,7 +161,7 @@ Built-in logging and validation results make it easy to:
 
 ### 🔄 No Peer Cooperation Required
 
-Unlike protocol-level security that requires all participants to cooperate, CapiscIO A2A Security protects **your agent** unilaterally. You don't need permission or coordination with peers.
+Unlike protocol-level security that requires all participants to cooperate, the CapiscIO Python SDK protects **your agent** unilaterally. You don't need permission or coordination with peers.
 
 ## Quick Example
 
@@ -222,7 +222,7 @@ _Learn more about each validator in the API reference (coming soon)._
 
 ## Performance
 
-CapiscIO A2A Security is designed for minimal overhead:
+The CapiscIO Python SDK is designed for minimal overhead:
 
 - **Caching**: Validation results cached with configurable TTL
 - **Async/Sync Split**: Expensive operations (certificate checks) are optional async
@@ -293,4 +293,4 @@ graph LR
 
 ## License
 
-CapiscIO A2A Security is open source under the [Apache 2.0 License](https://github.com/capiscio/capiscio-sdk-python/blob/main/LICENSE).
+The CapiscIO Python SDK is open source under the [Apache 2.0 License](https://github.com/capiscio/capiscio-sdk-python/blob/main/LICENSE).

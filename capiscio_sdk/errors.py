@@ -1,4 +1,4 @@
-"""Error types for Capiscio A2A Security."""
+"""Error types for Capiscio Python SDK."""
 from typing import Optional, List, Dict, Any
 from .types import ValidationResult
 

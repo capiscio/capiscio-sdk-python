@@ -1,6 +1,6 @@
 # Core Concepts
 
-Understanding the core concepts behind CapiscIO A2A Security will help you use it effectively and make informed configuration decisions.
+Understanding the core concepts behind the CapiscIO Python SDK will help you use it effectively and make informed configuration decisions.
 
 ## Unilateral Protection: The Key Difference
 
@@ -25,7 +25,7 @@ graph LR
 - ❌ You can't trust that agents follow the protocol correctly
 - ✅ **But you CAN protect yourself unilaterally**
 
-**CapiscIO A2A Security ensures:**
+**The CapiscIO Python SDK ensures:**
 
 1. All incoming requests are validated before processing
 2. All outgoing calls are only to validated, safe agents
@@ -468,20 +468,20 @@ config.upstream.test_endpoints = False
 
 ### Defense in Depth
 
-CapiscIO A2A Security is **one layer** of security:
+The CapiscIO Python SDK is **one layer** of security:
 
 ```mermaid
 graph TB
     A[Network Security<br/>Firewall] --> B[TLS/HTTPS Encryption]
     B --> C[Authentication/Authorization]
-    C --> D[CapiscIO A2A Security<br/>⭐ Protocol Validation]
+    C --> D[CapiscIO Python SDK<br/>⭐ Protocol Validation]
     D --> E[Your Agent Logic]
     E --> F[Data Validation]
     
     style D fill:#4db6ac,stroke:#00695c,stroke-width:3px,color:#fff
 ```
 
-**Recommendation:** Use CapiscIO A2A Security **in addition to** other security measures, not as a replacement.
+**Recommendation:** Use the CapiscIO Python SDK **in addition to** other security measures, not as a replacement.
 
 ## Next Steps
 
