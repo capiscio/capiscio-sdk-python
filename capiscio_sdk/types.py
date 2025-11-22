@@ -1,4 +1,4 @@
-"""Core types for Capiscio A2A Security."""
+"""Core types for Capiscio Python SDK."""
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from enum import Enum

@@ -1,4 +1,4 @@
-# Release Guide - CapiscIO A2A Security
+# Release Guide - CapiscIO Python SDK
 
 This guide explains how to release a new version of the package.
 

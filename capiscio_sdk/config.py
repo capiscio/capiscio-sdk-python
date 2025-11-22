@@ -1,4 +1,4 @@
-"""Configuration for Capiscio A2A Security."""
+"""Configuration for Capiscio Python SDK."""
 import os
 from typing import Literal
 from pydantic import BaseModel, Field

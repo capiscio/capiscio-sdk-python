@@ -1,6 +1,6 @@
 # Quick Start
 
-Get your A2A agent protected in **5 minutes** with CapiscIO A2A Security.
+Get your A2A agent protected in **5 minutes** with the CapiscIO Python SDK.
 
 ## See the Difference
 
@@ -304,7 +304,7 @@ Additional guides and examples are being developed:
     ```
 
 ??? question "Does this work with Google ADK agents?"
-    Yes! CapiscIO A2A Security works with any A2A-compliant agent, including those built with Google's Agent Development Kit (ADK).
+    Yes! The CapiscIO Python SDK works with any A2A-compliant agent, including those built with Google's Agent Development Kit (ADK).
     
     ```python
     from adk import ADKAgent

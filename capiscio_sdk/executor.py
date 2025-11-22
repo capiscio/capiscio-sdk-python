@@ -138,6 +138,20 @@ class CapiscioSecurityExecutor:
         # Cancellation just passes through - no security checks needed
         await self.delegate.cancel(context, event_queue)
 
+    async def validate_agent_card(self, url: str) -> ValidationResult:
+        """
+        Validate an agent card from a URL.
+        
+        Args:
+            url: URL to the agent card or agent root
+            
+        Returns:
+            ValidationResult with scores
+        """
+        from .validators.agent_card import AgentCardValidator
+        validator = AgentCardValidator()
+        return await validator.fetch_and_validate(url)
+
     def _validate_message(self, message: Dict[str, Any]) -> ValidationResult:
         """Validate message with caching."""
         # Try cache first
