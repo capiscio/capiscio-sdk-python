@@ -74,9 +74,9 @@ def run_client():
         print(f"Response: {res.json()}")
         
         if res.status_code == 403:
-             print("✅ SUCCESS: Tampered payload was blocked!")
+            print("✅ SUCCESS: Tampered payload was blocked!")
         else:
-             print("❌ FAILURE: Tampered payload was accepted!")
+            print("❌ FAILURE: Tampered payload was accepted!")
              
     except Exception as e:
         print(f"Error: {e}")
@@ -112,9 +112,9 @@ def run_client():
         print(f"Response: {res.json()}")
         
         if res.status_code == 403 and "expired" in res.json().get("error", "").lower():
-             print("✅ SUCCESS: Replay/Expired token was blocked!")
+            print("✅ SUCCESS: Replay/Expired token was blocked!")
         else:
-             print("❌ FAILURE: Expired token was accepted!")
+            print("❌ FAILURE: Expired token was accepted!")
     except Exception as e:
         print(f"Error: {e}")
 

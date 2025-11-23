@@ -3,10 +3,9 @@ import os
 import json
 import time
 import pytest
-import shutil
 from pathlib import Path
-from capiscio_sdk.simple_guard import SimpleGuard, MAX_TOKEN_AGE
-from capiscio_sdk.errors import VerificationError, ConfigurationError
+from capiscio_sdk.simple_guard import SimpleGuard
+from capiscio_sdk.errors import VerificationError
 
 @pytest.fixture
 def temp_workspace(tmp_path):

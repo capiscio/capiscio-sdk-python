@@ -94,12 +94,12 @@ pip install capiscio-sdk==0.1.0
 
 ### Added
 - **SimpleGuard Security Strategy**:
-  - **Identity**: Ed25519 JWS signature verification (`x-jws-signature` header).
+  - **Identity**: Ed25519 JWS signature verification (`X-Capiscio-JWS` header).
   - **Integrity**: SHA-256 Body Hash verification (`bh` claim) to prevent payload tampering.
   - **Freshness**: Replay protection using `exp` (expiration) and `iat` (issued at) claims with a 60-second window.
   - **Zero Config**: Secure by default with minimal setup.
 - **FastAPI Integration**:
-  - `SimpleGuardMiddleware`: Automatic request validation and identity injection into `request.state.identity`.
+  - `CapiscioMiddleware`: Automatic request validation and identity injection into `request.state.agent_id`.
   - `Server-Timing` header support for telemetry (verification time).
 - **Telemetry**:
   - Added `dur` (duration) metric to `Server-Timing` header for monitoring security overhead.
@@ -111,9 +111,6 @@ pip install capiscio-sdk==0.1.0
 ### Changed
 - **Breaking Change**: Shifted from "Validation" focus to "Enforcement" focus.
 - Updated `pyproject.toml` dependencies to include `cryptography` and `pyjwt`.
-
-### Removed
-- (If any features were removed, list them here. Based on context, we mostly added things, but the strategy shifted).
 
 ### Planned for v1.0.0
 - Full A2A v1.0 compliance

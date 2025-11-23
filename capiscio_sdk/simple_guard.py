@@ -85,10 +85,8 @@ class SimpleGuard:
         
         # Replay Protection: Inject timestamps
         now = int(time.time())
-        if "iat" not in payload:
-            payload["iat"] = now
-        if "exp" not in payload:
-            payload["exp"] = now + MAX_TOKEN_AGE
+        payload["iat"] = now
+        payload["exp"] = now + MAX_TOKEN_AGE
         
         # Integrity: Calculate Body Hash if body is provided
         if body is not None:

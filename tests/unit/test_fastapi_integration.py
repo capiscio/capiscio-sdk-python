@@ -1,7 +1,7 @@
 """Tests for FastAPI integration."""
 import json
 import pytest
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from capiscio_sdk.simple_guard import SimpleGuard
 from capiscio_sdk.integrations.fastapi import CapiscioMiddleware
