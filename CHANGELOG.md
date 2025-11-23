@@ -90,6 +90,11 @@ pip install capiscio-sdk==0.1.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2025-11-23
+
+### Fixed
+- **Release Automation**: Bumped version to trigger fresh GitHub Release and PyPI publication with correct artifacts.
+
 ## [0.3.0] - 2025-11-22
 
 ### Added
