@@ -67,3 +67,13 @@ class CapiscioTimeoutError(CapiscioSecurityError):
     """Operation timed out."""
 
     pass
+
+
+class ConfigurationError(CapiscioSecurityError):
+    """Missing keys or invalid paths (SimpleGuard)."""
+    pass
+
+
+class VerificationError(CapiscioSecurityError):
+    """Invalid signature, expired token, or untrusted key (SimpleGuard)."""
+    pass

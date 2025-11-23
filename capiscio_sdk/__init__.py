@@ -12,6 +12,7 @@ __version__ = "0.2.0"
 
 # Core exports
 from .executor import CapiscioSecurityExecutor, secure, secure_agent
+from .simple_guard import SimpleGuard
 from .config import SecurityConfig, DownstreamConfig, UpstreamConfig
 from .errors import (
     CapiscioSecurityError,
@@ -25,6 +26,7 @@ from .types import ValidationResult, ValidationIssue, ValidationSeverity
 __all__ = [
     "__version__",
     "CapiscioSecurityExecutor",
+    "SimpleGuard",
     "secure",
     "secure_agent",
     "SecurityConfig",
