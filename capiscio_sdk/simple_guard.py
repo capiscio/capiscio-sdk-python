@@ -6,7 +6,7 @@ import base64
 import hashlib
 import time
 from pathlib import Path
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Union, cast
 
 import jwt
 from cryptography.hazmat.primitives import serialization
@@ -31,7 +31,7 @@ class SimpleGuard:
         self, 
         base_dir: Optional[Union[str, Path]] = None, 
         dev_mode: bool = False
-    ):
+    ) -> None:
         """
         Initialize SimpleGuard.
 
@@ -148,6 +148,9 @@ class SimpleGuard:
             # Load the trusted public key
             with open(trusted_key_path, "rb") as f:
                 public_key = serialization.load_pem_public_key(f.read())
+                # Ensure it is a key type compatible with jwt.decode (Ed25519PublicKey is supported)
+                # We cast to Any to satisfy mypy's strict check against the specific union
+                public_key = cast(Any, public_key)
 
             # 3. Verify Signature
             payload = jwt.decode(
@@ -156,6 +159,9 @@ class SimpleGuard:
                 algorithms=["EdDSA"],
                 options={"verify_aud": False} # Audience verification depends on context, skipping for generic guard
             )
+            
+            # Cast payload to Dict[str, Any]
+            payload = cast(Dict[str, Any], payload)
 
             # 4. Integrity Check (Body Hash)
             if "bh" in payload:
@@ -225,7 +231,7 @@ class SimpleGuard:
         # If not found, default to cwd
         return current
 
-    def _load_or_generate_card(self):
+    def _load_or_generate_card(self) -> None:
         """Load agent-card.json or generate a minimal one in dev_mode."""
         if self.agent_card_path.exists():
             try:
@@ -255,7 +261,7 @@ class SimpleGuard:
         else:
             raise ConfigurationError(f"agent-card.json not found at {self.project_root}")
 
-    def _load_or_generate_keys(self):
+    def _load_or_generate_keys(self) -> None:
         """Load private.pem or generate it in dev_mode."""
         if not self.keys_dir.exists():
             if self.dev_mode:
@@ -267,9 +273,12 @@ class SimpleGuard:
         if self.private_key_path.exists():
             try:
                 with open(self.private_key_path, "rb") as f:
-                    self._private_key = serialization.load_pem_private_key(
+                    loaded_key = serialization.load_pem_private_key(
                         f.read(), password=None
                     )
+                    if not isinstance(loaded_key, ed25519.Ed25519PrivateKey):
+                        raise ConfigurationError("Private key is not an Ed25519 key.")
+                    self._private_key = loaded_key
             except Exception as e:
                 raise ConfigurationError(f"Failed to load private.pem: {e}")
         elif self.dev_mode:
@@ -298,7 +307,7 @@ class SimpleGuard:
         else:
             raise ConfigurationError(f"private.pem not found at {self.private_key_path}")
 
-    def _update_agent_card_with_jwk(self, public_key: ed25519.Ed25519PublicKey):
+    def _update_agent_card_with_jwk(self, public_key: ed25519.Ed25519PublicKey) -> None:
         """Helper to write the agent-card.json with the generated key."""
         # Convert Ed25519 public key to JWK parameters
         # Ed25519 keys are simple: x is the raw bytes
@@ -333,7 +342,7 @@ class SimpleGuard:
             json.dump(card_data, f, indent=2)
         logger.info(f"Created agent-card.json at {self.agent_card_path}")
 
-    def _setup_trust_store(self):
+    def _setup_trust_store(self) -> None:
         """Ensure trust store exists and add self-trust in dev_mode."""
         if not self.trusted_dir.exists() and self.dev_mode:
             self.trusted_dir.mkdir(parents=True, exist_ok=True)

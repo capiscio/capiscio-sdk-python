@@ -1,8 +1,10 @@
 """FastAPI integration for Capiscio SimpleGuard."""
+from typing import Callable, Awaitable, Any, Dict
 try:
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.requests import Request
-    from starlette.responses import JSONResponse
+    from starlette.responses import JSONResponse, Response
+    from starlette.types import ASGIApp
 except ImportError:
     raise ImportError("FastAPI/Starlette is required for this integration. Install with 'pip install fastapi'.")
 
@@ -14,11 +16,15 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
     """
     Middleware to enforce A2A identity verification on incoming requests.
     """
-    def __init__(self, app, guard: SimpleGuard):
+    def __init__(self, app: ASGIApp, guard: SimpleGuard) -> None:
         super().__init__(app)
         self.guard = guard
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self, 
+        request: Request, 
+        call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         # Allow health checks or public endpoints if needed
         # For now, we assume everything under /agent/ needs protection
         # But let's just check for the header.
@@ -45,7 +51,7 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
             payload = self.guard.verify_inbound(auth_header, body=body_bytes)
             
             # Reset the receive channel so downstream can read the body
-            async def receive():
+            async def receive() -> Dict[str, Any]:
                 return {"type": "http.request", "body": body_bytes, "more_body": False}
             request._receive = receive
             
