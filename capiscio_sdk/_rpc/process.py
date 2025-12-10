@@ -3,9 +3,7 @@
 import atexit
 import os
 import shutil
-import signal
 import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Optional
@@ -44,7 +42,7 @@ class ProcessManager:
         return cls._instance
     
     def __init__(self) -> None:
-        if self._initialized:
+        if hasattr(self, '_initialized') and self._initialized:
             return
         self._initialized = True
         self._binary_path: Optional[Path] = None
@@ -87,7 +85,7 @@ class ProcessManager:
         # Check relative to this file (development mode)
         # SDK is at capiscio-sdk-python/capiscio_sdk/_rpc/
         # Binary is at capiscio-core/bin/capiscio
-        sdk_root = Path(__file__).parent.parent.parent.parent
+        sdk_root = Path(__file__).parent.parent.parent
         workspace_root = sdk_root.parent
         dev_binary = workspace_root / "capiscio-core" / "bin" / "capiscio"
         if dev_binary.exists():
@@ -210,6 +208,7 @@ class ProcessManager:
             try:
                 self._socket_path.unlink()
             except OSError:
+                # Socket may have been cleaned up by another process
                 pass
     
     def restart(self) -> str:
