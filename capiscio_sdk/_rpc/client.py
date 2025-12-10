@@ -419,18 +419,177 @@ class SimpleGuardClient:
         self._stub = stub
     
     def sign(self, payload: bytes, key_id: str) -> tuple[bytes, Optional[str]]:
-        """Sign a message."""
+        """Sign a message (raw signature).
+        
+        Args:
+            payload: Message bytes to sign
+            key_id: Key ID to use for signing
+            
+        Returns:
+            Tuple of (signature_bytes, error_message)
+        """
         request = simpleguard_pb2.SignRequest(payload=payload, key_id=key_id)
         response = self._stub.Sign(request)
         error = response.error_message if response.error_message else None
         return response.signature, error
     
-    def verify(self, payload: bytes, signature: bytes) -> tuple[bool, Optional[str]]:
-        """Verify a signed message."""
-        request = simpleguard_pb2.VerifyRequest(payload=payload, signature=signature)
+    def verify(
+        self, payload: bytes, signature: bytes, expected_signer: str = ""
+    ) -> tuple[bool, str, Optional[str]]:
+        """Verify a signed message.
+        
+        Args:
+            payload: Original message bytes
+            signature: Signature bytes to verify
+            expected_signer: Optional expected signer key ID
+            
+        Returns:
+            Tuple of (valid, key_id, error_message)
+        """
+        request = simpleguard_pb2.VerifyRequest(
+            payload=payload,
+            signature=signature,
+            expected_signer=expected_signer,
+        )
         response = self._stub.Verify(request)
         error = response.error_message if response.error_message else None
-        return response.valid, error
+        return response.valid, response.key_id, error
+    
+    def sign_attached(
+        self,
+        payload: bytes,
+        key_id: str,
+        headers: Optional[dict] = None,
+    ) -> tuple[str, Optional[str]]:
+        """Sign with attached payload (creates JWS).
+        
+        Args:
+            payload: Payload bytes
+            key_id: Key ID to use
+            headers: Optional additional JWS headers
+            
+        Returns:
+            Tuple of (jws_token, error_message)
+        """
+        request = simpleguard_pb2.SignAttachedRequest(
+            payload=payload,
+            key_id=key_id,
+            headers=headers or {},
+        )
+        response = self._stub.SignAttached(request)
+        error = response.error_message if response.error_message else None
+        return response.jws, error
+    
+    def verify_attached(
+        self,
+        jws: str,
+        body: Optional[bytes] = None,
+    ) -> tuple[bool, Optional[bytes], str, Optional[str]]:
+        """Verify JWS with optional body hash check.
+        
+        Args:
+            jws: JWS compact token
+            body: Optional body bytes to verify against 'bh' claim
+            
+        Returns:
+            Tuple of (valid, payload, key_id, error_message)
+        """
+        request = simpleguard_pb2.VerifyAttachedRequest(
+            jws=jws,
+            detached_payload=body or b"",
+        )
+        response = self._stub.VerifyAttached(request)
+        error = response.error_message if response.error_message else None
+        payload = response.payload if response.payload else None
+        return response.valid, payload, response.key_id, error
+    
+    def generate_key_pair(
+        self, key_id: str = "", metadata: Optional[dict] = None
+    ) -> tuple[Optional[dict], Optional[str]]:
+        """Generate a new Ed25519 key pair.
+        
+        Args:
+            key_id: Optional specific key ID
+            metadata: Optional metadata to associate with key
+            
+        Returns:
+            Tuple of (key_info, error_message)
+        """
+        request = simpleguard_pb2.GenerateKeyPairRequest(
+            algorithm=trust_pb2.KEY_ALGORITHM_ED25519,
+            key_id=key_id,
+            metadata=metadata or {},
+        )
+        response = self._stub.GenerateKeyPair(request)
+        error = response.error_message if response.error_message else None
+        if error:
+            return None, error
+        return {
+            "key_id": response.key_id,
+            "public_key_pem": response.public_key_pem,
+            "private_key_pem": response.private_key_pem,
+        }, None
+    
+    def load_key(self, file_path: str) -> tuple[Optional[dict], Optional[str]]:
+        """Load key from PEM file.
+        
+        Args:
+            file_path: Path to PEM file
+            
+        Returns:
+            Tuple of (key_info, error_message)
+        """
+        request = simpleguard_pb2.LoadKeyRequest(file_path=file_path)
+        response = self._stub.LoadKey(request)
+        error = response.error_message if response.error_message else None
+        if error:
+            return None, error
+        return {
+            "key_id": response.key_id,
+            "has_private_key": response.has_private_key,
+        }, None
+    
+    def export_key(
+        self, key_id: str, file_path: str, include_private: bool = False
+    ) -> tuple[bool, Optional[str]]:
+        """Export key to PEM file.
+        
+        Args:
+            key_id: Key to export
+            file_path: Destination path
+            include_private: Whether to include private key
+            
+        Returns:
+            Tuple of (success, error_message)
+        """
+        request = simpleguard_pb2.ExportKeyRequest(
+            key_id=key_id,
+            file_path=file_path,
+            include_private=include_private,
+        )
+        response = self._stub.ExportKey(request)
+        error = response.error_message if response.error_message else None
+        return error is None, error
+    
+    def get_key_info(self, key_id: str) -> tuple[Optional[dict], Optional[str]]:
+        """Get info about a loaded key.
+        
+        Args:
+            key_id: Key to query
+            
+        Returns:
+            Tuple of (key_info, error_message)
+        """
+        request = simpleguard_pb2.GetKeyInfoRequest(key_id=key_id)
+        response = self._stub.GetKeyInfo(request)
+        error = response.error_message if response.error_message else None
+        if error:
+            return None, error
+        return {
+            "key_id": response.key_id,
+            "has_private_key": response.has_private_key,
+            "public_key_pem": response.public_key_pem,
+        }, None
 
 
 class RegistryClient:
