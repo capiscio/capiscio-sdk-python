@@ -35,6 +35,16 @@ class BadgeServiceStub(object):
                 request_serializer=capiscio_dot_v1_dot_badge__pb2.ParseBadgeRequest.SerializeToString,
                 response_deserializer=capiscio_dot_v1_dot_badge__pb2.ParseBadgeResponse.FromString,
                 _registered_method=True)
+        self.RequestBadge = channel.unary_unary(
+                '/capiscio.v1.BadgeService/RequestBadge',
+                request_serializer=capiscio_dot_v1_dot_badge__pb2.RequestBadgeRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_badge__pb2.RequestBadgeResponse.FromString,
+                _registered_method=True)
+        self.StartKeeper = channel.unary_stream(
+                '/capiscio.v1.BadgeService/StartKeeper',
+                request_serializer=capiscio_dot_v1_dot_badge__pb2.StartKeeperRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_badge__pb2.KeeperEvent.FromString,
+                _registered_method=True)
 
 
 class BadgeServiceServicer(object):
@@ -69,6 +79,22 @@ class BadgeServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RequestBadge(self, request, context):
+        """Request a badge from a Certificate Authority (RFC-002 §12.1)
+        This is for production use where badges are issued by CapiscIO registry
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StartKeeper(self, request, context):
+        """Start a badge keeper that automatically renews badges (RFC-002 §7.3)
+        Returns a stream of keeper events (started, renewed, error, stopped)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_BadgeServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -91,6 +117,16 @@ def add_BadgeServiceServicer_to_server(servicer, server):
                     servicer.ParseBadge,
                     request_deserializer=capiscio_dot_v1_dot_badge__pb2.ParseBadgeRequest.FromString,
                     response_serializer=capiscio_dot_v1_dot_badge__pb2.ParseBadgeResponse.SerializeToString,
+            ),
+            'RequestBadge': grpc.unary_unary_rpc_method_handler(
+                    servicer.RequestBadge,
+                    request_deserializer=capiscio_dot_v1_dot_badge__pb2.RequestBadgeRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_badge__pb2.RequestBadgeResponse.SerializeToString,
+            ),
+            'StartKeeper': grpc.unary_stream_rpc_method_handler(
+                    servicer.StartKeeper,
+                    request_deserializer=capiscio_dot_v1_dot_badge__pb2.StartKeeperRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_badge__pb2.KeeperEvent.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -202,6 +238,60 @@ class BadgeService(object):
             '/capiscio.v1.BadgeService/ParseBadge',
             capiscio_dot_v1_dot_badge__pb2.ParseBadgeRequest.SerializeToString,
             capiscio_dot_v1_dot_badge__pb2.ParseBadgeResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RequestBadge(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.BadgeService/RequestBadge',
+            capiscio_dot_v1_dot_badge__pb2.RequestBadgeRequest.SerializeToString,
+            capiscio_dot_v1_dot_badge__pb2.RequestBadgeResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StartKeeper(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/capiscio.v1.BadgeService/StartKeeper',
+            capiscio_dot_v1_dot_badge__pb2.StartKeeperRequest.SerializeToString,
+            capiscio_dot_v1_dot_badge__pb2.KeeperEvent.FromString,
             options,
             channel_credentials,
             insecure,

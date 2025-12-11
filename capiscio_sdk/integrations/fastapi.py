@@ -32,13 +32,14 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
         if request.method == "OPTIONS":
             return await call_next(request)
 
-        auth_header = request.headers.get("X-Capiscio-JWS")
+        # RFC-002 §9.1: X-Capiscio-Badge header
+        auth_header = request.headers.get("X-Capiscio-Badge")
         
         # If no header, we might let it pass but mark as unverified?
         # The mandate says: "Returns 401 (missing) or 403 (invalid)."
         if not auth_header:
              return JSONResponse(
-                 {"error": "Missing X-Capiscio-JWS header. This endpoint is protected by CapiscIO."}, 
+                 {"error": "Missing X-Capiscio-Badge header. This endpoint is protected by CapiscIO."}, 
                  status_code=401
              )
 
