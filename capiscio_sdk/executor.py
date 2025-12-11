@@ -151,8 +151,9 @@ class CapiscioSecurityExecutor:
         Returns:
             ValidationResult with scores
         """
-        from .validators import validate_agent_card
-        return await validate_agent_card(url)
+        from .validators import CoreValidator
+        with CoreValidator() as validator:
+            return await validator.fetch_and_validate(url)
 
     def _validate_message(self, message: Dict[str, Any]) -> ValidationResult:
         """Validate message with caching."""
