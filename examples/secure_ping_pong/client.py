@@ -23,9 +23,9 @@ def run_client():
     token = guard.sign_outbound(payload, body=body_bytes)
     sign_time = (time.perf_counter() - t0) * 1000
     
-    headers = {"X-Capiscio-JWS": token, "Content-Type": "application/json"}
+    headers = {"X-Capiscio-Badge": token, "Content-Type": "application/json"}
     
-    print(f"Injecting Header: X-Capiscio-JWS: {headers['X-Capiscio-JWS'][:20]}...")
+    print(f"Injecting Header: X-Capiscio-Badge: {headers['X-Capiscio-Badge'][:20]}...")
     print(f"⏱️  Client Signing Time: {sign_time:.3f} ms")
     
     try:
@@ -62,7 +62,7 @@ def run_client():
     
     # Sign the ORIGINAL body
     token = guard.sign_outbound({"sub": "test"}, body=original_bytes)
-    headers = {"X-Capiscio-JWS": token, "Content-Type": "application/json"}
+    headers = {"X-Capiscio-Badge": token, "Content-Type": "application/json"}
     
     try:
         # Send the TAMPERED body
@@ -101,7 +101,7 @@ def run_client():
     payload_replay["exp"] = now - 10
     
     token_replay = guard.sign_outbound(payload_replay, body=body_bytes_replay)
-    headers_replay = {"X-Capiscio-JWS": token_replay, "Content-Type": "application/json"}
+    headers_replay = {"X-Capiscio-Badge": token_replay, "Content-Type": "application/json"}
 
     print("Waiting 65 seconds to test replay... (Simulated by backdating token)")
     # time.sleep(65) # Uncomment for real-time test

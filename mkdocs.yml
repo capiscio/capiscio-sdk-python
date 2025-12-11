@@ -61,3 +61,4 @@ nav:
   - Guides:
       - Scoring System: guides/scoring.md
       - Configuration: guides/configuration.md
+  - API Reference: api-reference.md

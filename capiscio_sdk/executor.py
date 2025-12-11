@@ -142,18 +142,17 @@ class CapiscioSecurityExecutor:
         """
         Validate an agent card from a URL.
         
+        Uses CoreValidator which delegates to Go core for consistent
+        validation across all CapiscIO SDKs.
+        
         Args:
             url: URL to the agent card or agent root
             
         Returns:
             ValidationResult with scores
         """
-        from .validators.agent_card import AgentCardValidator
-        validator = AgentCardValidator()
-        try:
-            return await validator.fetch_and_validate(url)
-        finally:
-            await validator.http_client.aclose()
+        from .validators import validate_agent_card
+        return await validate_agent_card(url)
 
     def _validate_message(self, message: Dict[str, Any]) -> ValidationResult:
         """Validate message with caching."""

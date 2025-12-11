@@ -261,6 +261,71 @@ class BadgeClient:
         error = response.error_message if response.error_message else None
         return response.valid, claims, error
     
+    def verify_badge_with_options(
+        self,
+        token: str,
+        accept_self_signed: bool = False,
+        trusted_issuers: Optional[list[str]] = None,
+        audience: str = "",
+        skip_revocation: bool = False,
+        skip_agent_status: bool = False,
+        mode: str = "online",
+    ) -> tuple[bool, Optional[dict], list[str], Optional[str]]:
+        """Verify a badge token with full options.
+        
+        This is the recommended method for verifying badges, especially
+        self-signed (Level 0) badges from did:key issuers.
+        
+        Args:
+            token: Badge JWT token
+            accept_self_signed: Accept Level 0 self-signed badges (did:key issuer)
+            trusted_issuers: List of trusted issuer DIDs
+            audience: Expected audience (your service's identifier)
+            skip_revocation: Skip revocation check
+            skip_agent_status: Skip agent status check
+            mode: Verification mode ('online', 'offline', 'hybrid')
+            
+        Returns:
+            Tuple of (valid, claims, warnings, error_message)
+            
+        Example:
+            # Verify a self-signed badge
+            valid, claims, warnings, error = client.badge.verify_badge_with_options(
+                token,
+                accept_self_signed=True,
+            )
+            if valid:
+                print(f"Badge valid for {claims['sub']}")
+                print(f"Trust level: {claims['trust_level']}")
+        """
+        # Map mode string to proto enum
+        mode_map = {
+            "online": badge_pb2.VerifyMode.VERIFY_MODE_ONLINE,
+            "offline": badge_pb2.VerifyMode.VERIFY_MODE_OFFLINE,
+            "hybrid": badge_pb2.VerifyMode.VERIFY_MODE_HYBRID,
+        }
+        verify_mode = mode_map.get(mode.lower(), badge_pb2.VerifyMode.VERIFY_MODE_ONLINE)
+        
+        options = badge_pb2.VerifyOptions(
+            mode=verify_mode,
+            trusted_issuers=trusted_issuers or [],
+            audience=audience,
+            skip_revocation=skip_revocation,
+            skip_agent_status=skip_agent_status,
+            accept_self_signed=accept_self_signed,
+        )
+        
+        request = badge_pb2.VerifyBadgeWithOptionsRequest(
+            token=token,
+            options=options,
+        )
+        
+        response = self._stub.VerifyBadgeWithOptions(request)
+        claims = _claims_to_dict(response.claims) if response.claims else None
+        warnings = list(response.warnings) if response.warnings else []
+        error = response.error_message if response.error_message else None
+        return response.valid, claims, warnings, error
+    
     def parse_badge(self, token: str) -> tuple[Optional[dict], Optional[str]]:
         """Parse badge claims without verification.
         
@@ -275,6 +340,198 @@ class BadgeClient:
         claims = _claims_to_dict(response.claims) if response.claims else None
         error = response.error_message if response.error_message else None
         return claims, error
+
+    def request_badge(
+        self,
+        agent_id: str,
+        api_key: str,
+        ca_url: str = "",
+        domain: str = "",
+        ttl_seconds: int = 300,
+        trust_level: int = 1,
+        audience: Optional[list[str]] = None,
+    ) -> tuple[bool, Optional[dict], Optional[str]]:
+        """Request a badge from a Certificate Authority (RFC-002 §12.1).
+        
+        This requests a new badge from the CapiscIO registry CA. The badge
+        is signed by the CA and can be used for authenticated A2A communication.
+        
+        Args:
+            agent_id: Agent UUID to request badge for
+            api_key: API key for authentication (sk_live_... or sk_test_...)
+            ca_url: CA URL (default: https://registry.capisc.io)
+            domain: Agent domain (optional, uses registered domain)
+            ttl_seconds: Badge TTL in seconds (default: 300 per RFC-002)
+            trust_level: Trust level 1-4 (default: 1=DV)
+            audience: Optional audience restrictions
+            
+        Returns:
+            Tuple of (success, result_dict, error_message)
+            result_dict contains: token, jti, subject, trust_level, expires_at
+            
+        Example:
+            success, result, error = client.badge.request_badge(
+                agent_id="my-agent-uuid",
+                api_key=os.environ["CAPISCIO_API_KEY"],
+            )
+            if success:
+                token = result["token"]
+                print(f"Badge expires: {result['expires_at']}")
+        """
+        # Map trust level int to proto enum
+        trust_level_map = {
+            0: badge_pb2.TrustLevel.TRUST_LEVEL_SELF_SIGNED,
+            1: badge_pb2.TrustLevel.TRUST_LEVEL_DV,
+            2: badge_pb2.TrustLevel.TRUST_LEVEL_OV,
+            3: badge_pb2.TrustLevel.TRUST_LEVEL_EV,
+            4: badge_pb2.TrustLevel.TRUST_LEVEL_CV,
+        }
+        pb_trust_level = trust_level_map.get(
+            trust_level, badge_pb2.TrustLevel.TRUST_LEVEL_DV
+        )
+        
+        request = badge_pb2.RequestBadgeRequest(
+            agent_id=agent_id,
+            ca_url=ca_url,
+            api_key=api_key,
+            domain=domain,
+            ttl_seconds=ttl_seconds,
+            trust_level=pb_trust_level,
+            audience=audience or [],
+        )
+        
+        response = self._stub.RequestBadge(request)
+        
+        if not response.success:
+            return False, None, response.error
+        
+        result = {
+            "token": response.token,
+            "jti": response.jti,
+            "subject": response.subject,
+            "trust_level": _trust_level_to_string(response.trust_level),
+            "expires_at": response.expires_at,
+        }
+        return True, result, None
+
+    def start_keeper(
+        self,
+        mode: str,
+        output_file: str = "badge.jwt",
+        agent_id: str = "",
+        api_key: str = "",
+        ca_url: str = "",
+        private_key_path: str = "",
+        domain: str = "",
+        ttl_seconds: int = 300,
+        renew_before_seconds: int = 60,
+        check_interval_seconds: int = 30,
+        trust_level: int = 1,
+    ):
+        """Start a badge keeper daemon (RFC-002 §7.3).
+        
+        The keeper automatically renews badges before they expire, ensuring
+        continuous operation. Returns a generator of keeper events.
+        
+        Args:
+            mode: 'ca' for CA mode, 'self-sign' for development
+            output_file: Path to write badge file
+            agent_id: Agent UUID (required for CA mode)
+            api_key: API key (required for CA mode)
+            ca_url: CA URL (default: https://registry.capisc.io)
+            private_key_path: Path to private key JWK (required for self-sign)
+            domain: Agent domain
+            ttl_seconds: Badge TTL (default: 300)
+            renew_before_seconds: Renew this many seconds before expiry (default: 60)
+            check_interval_seconds: Check interval (default: 30)
+            trust_level: Trust level for CA mode (1-4, default: 1)
+            
+        Yields:
+            KeeperEvent dicts with: type, badge_jti, subject, trust_level,
+            expires_at, error, error_code, timestamp, token
+            
+        Example:
+            # CA mode
+            for event in client.badge.start_keeper(
+                mode="ca",
+                agent_id="my-agent-uuid",
+                api_key=os.environ["CAPISCIO_API_KEY"],
+            ):
+                if event["type"] == "renewed":
+                    print(f"Badge renewed: {event['badge_jti']}")
+                elif event["type"] == "error":
+                    print(f"Error: {event['error']}")
+        """
+        # Map mode string to proto enum
+        mode_map = {
+            "ca": badge_pb2.KeeperMode.KEEPER_MODE_CA,
+            "self-sign": badge_pb2.KeeperMode.KEEPER_MODE_SELF_SIGN,
+            "self_sign": badge_pb2.KeeperMode.KEEPER_MODE_SELF_SIGN,
+        }
+        pb_mode = mode_map.get(mode.lower(), badge_pb2.KeeperMode.KEEPER_MODE_CA)
+        
+        # Map trust level int to proto enum
+        trust_level_map = {
+            0: badge_pb2.TrustLevel.TRUST_LEVEL_SELF_SIGNED,
+            1: badge_pb2.TrustLevel.TRUST_LEVEL_DV,
+            2: badge_pb2.TrustLevel.TRUST_LEVEL_OV,
+            3: badge_pb2.TrustLevel.TRUST_LEVEL_EV,
+            4: badge_pb2.TrustLevel.TRUST_LEVEL_CV,
+        }
+        pb_trust_level = trust_level_map.get(
+            trust_level, badge_pb2.TrustLevel.TRUST_LEVEL_DV
+        )
+        
+        request = badge_pb2.StartKeeperRequest(
+            mode=pb_mode,
+            agent_id=agent_id,
+            ca_url=ca_url,
+            api_key=api_key,
+            output_file=output_file,
+            ttl_seconds=ttl_seconds,
+            renew_before_seconds=renew_before_seconds,
+            check_interval_seconds=check_interval_seconds,
+            private_key_path=private_key_path,
+            domain=domain,
+            trust_level=pb_trust_level,
+        )
+        
+        # Stream events from keeper
+        for event in self._stub.StartKeeper(request):
+            yield _keeper_event_to_dict(event)
+
+
+def _keeper_event_to_dict(event) -> dict:
+    """Convert KeeperEvent proto to dict."""
+    event_type_map = {
+        badge_pb2.KeeperEventType.KEEPER_EVENT_STARTED: "started",
+        badge_pb2.KeeperEventType.KEEPER_EVENT_RENEWED: "renewed",
+        badge_pb2.KeeperEventType.KEEPER_EVENT_ERROR: "error",
+        badge_pb2.KeeperEventType.KEEPER_EVENT_STOPPED: "stopped",
+    }
+    return {
+        "type": event_type_map.get(event.type, "unknown"),
+        "badge_jti": event.badge_jti,
+        "subject": event.subject,
+        "trust_level": _trust_level_to_string(event.trust_level),
+        "expires_at": event.expires_at,
+        "error": event.error,
+        "error_code": event.error_code,
+        "timestamp": event.timestamp,
+        "token": event.token,
+    }
+
+
+def _trust_level_to_string(trust_level) -> str:
+    """Convert TrustLevel proto enum to string."""
+    level_map = {
+        badge_pb2.TrustLevel.TRUST_LEVEL_SELF_SIGNED: "0",
+        badge_pb2.TrustLevel.TRUST_LEVEL_DV: "1",
+        badge_pb2.TrustLevel.TRUST_LEVEL_OV: "2",
+        badge_pb2.TrustLevel.TRUST_LEVEL_EV: "3",
+        badge_pb2.TrustLevel.TRUST_LEVEL_CV: "4",
+    }
+    return level_map.get(trust_level, "")
 
 
 class DIDClient:
@@ -401,15 +658,192 @@ class ScoringClient:
         self._stub = stub
     
     def score_agent_card(self, agent_card_json: str) -> tuple[Optional[dict], Optional[str]]:
-        """Score an agent card."""
+        """Score an agent card.
+        
+        Args:
+            agent_card_json: Agent card as JSON string
+            
+        Returns:
+            Tuple of (scoring_result_dict, error_message)
+        """
         request = scoring_pb2.ScoreAgentCardRequest(agent_card_json=agent_card_json)
         response = self._stub.ScoreAgentCard(request)
         
         if response.error_message:
             return None, response.error_message
         
-        # TODO: Convert response.result to dict
-        return None, "not yet implemented"
+        if not response.result:
+            return None, "No result returned"
+        
+        # Convert protobuf result to dict
+        result = response.result
+        return {
+            "overall_score": result.overall_score,
+            "rating": result.rating,
+            "categories": [
+                {
+                    "category": cat.category,
+                    "score": cat.score,
+                    "rules_passed": cat.rules_passed,
+                    "rules_failed": cat.rules_failed,
+                }
+                for cat in result.categories
+            ],
+            "rule_results": [
+                {
+                    "rule_id": r.rule_id,
+                    "passed": r.passed,
+                    "message": r.message,
+                    "details": dict(r.details),
+                }
+                for r in result.rule_results
+            ],
+            "validation": {
+                "valid": result.validation.valid if result.validation else True,
+                "issues": [
+                    {
+                        "code": i.code,
+                        "message": i.message,
+                        "severity": i.severity,
+                        "field": i.field,
+                    }
+                    for i in (result.validation.issues if result.validation else [])
+                ],
+            },
+            "scored_at": result.scored_at.value if result.scored_at else None,
+            "rule_set_id": result.rule_set_id,
+            "rule_set_version": result.rule_set_version,
+        }, None
+    
+    def validate_rule(self, rule_id: str, agent_card_json: str) -> tuple[Optional[dict], Optional[str]]:
+        """Validate a single rule against an agent card.
+        
+        Args:
+            rule_id: ID of the rule to validate
+            agent_card_json: Agent card as JSON string
+            
+        Returns:
+            Tuple of (rule_result_dict, error_message)
+        """
+        request = scoring_pb2.ValidateRuleRequest(
+            rule_id=rule_id,
+            agent_card_json=agent_card_json,
+        )
+        response = self._stub.ValidateRule(request)
+        
+        if response.error_message:
+            return None, response.error_message
+        
+        if not response.result:
+            return None, "No result returned"
+        
+        return {
+            "rule_id": response.result.rule_id,
+            "passed": response.result.passed,
+            "message": response.result.message,
+            "details": dict(response.result.details),
+        }, None
+    
+    def list_rule_sets(self) -> tuple[list[dict], Optional[str]]:
+        """List available rule sets.
+        
+        Returns:
+            Tuple of (list_of_rule_sets, error_message)
+        """
+        request = scoring_pb2.ListRuleSetsRequest()
+        response = self._stub.ListRuleSets(request)
+        
+        rule_sets = []
+        for rs in response.rule_sets:
+            rule_sets.append({
+                "id": rs.id,
+                "name": rs.name,
+                "version": rs.version,
+                "description": rs.description,
+                "rules": [
+                    {
+                        "id": r.id,
+                        "name": r.name,
+                        "description": r.description,
+                        "category": r.category,
+                        "severity": r.severity,
+                        "weight": r.weight,
+                    }
+                    for r in rs.rules
+                ],
+            })
+        
+        return rule_sets, None
+    
+    def get_rule_set(self, rule_set_id: str) -> tuple[Optional[dict], Optional[str]]:
+        """Get details of a specific rule set.
+        
+        Args:
+            rule_set_id: ID of the rule set
+            
+        Returns:
+            Tuple of (rule_set_dict, error_message)
+        """
+        request = scoring_pb2.GetRuleSetRequest(id=rule_set_id)
+        response = self._stub.GetRuleSet(request)
+        
+        if response.error_message:
+            return None, response.error_message
+        
+        if not response.rule_set:
+            return None, "No rule set returned"
+        
+        rs = response.rule_set
+        return {
+            "id": rs.id,
+            "name": rs.name,
+            "version": rs.version,
+            "description": rs.description,
+            "rules": [
+                {
+                    "id": r.id,
+                    "name": r.name,
+                    "description": r.description,
+                    "category": r.category,
+                    "severity": r.severity,
+                    "weight": r.weight,
+                }
+                for r in rs.rules
+            ],
+        }, None
+    
+    def aggregate_scores(
+        self, 
+        results: list[dict], 
+        method: str = "average"
+    ) -> tuple[Optional[dict], Optional[str]]:
+        """Aggregate multiple scoring results.
+        
+        Args:
+            results: List of scoring result dicts with 'overall_score' key
+            method: Aggregation method ('average', 'min', 'max')
+            
+        Returns:
+            Tuple of (aggregate_result, error_message)
+        """
+        # Convert dicts to protobuf messages
+        pb_results = []
+        for r in results:
+            pb_results.append(scoring_pb2.ScoringResult(
+                overall_score=r.get("overall_score", 0),
+            ))
+        
+        request = scoring_pb2.AggregateScoresRequest(
+            results=pb_results,
+            aggregation_method=method,
+        )
+        response = self._stub.AggregateScores(request)
+        
+        return {
+            "aggregate_score": response.aggregate_score,
+            "aggregate_rating": response.aggregate_rating,
+            "category_aggregates": dict(response.category_aggregates),
+        }, None
 
 
 class SimpleGuardClient:
@@ -514,6 +948,7 @@ class SimpleGuardClient:
             
         Returns:
             Tuple of (key_info, error_message)
+            key_info contains: key_id, public_key_pem, private_key_pem, did_key
         """
         request = simpleguard_pb2.GenerateKeyPairRequest(
             algorithm=trust_pb2.KEY_ALGORITHM_ED25519,
@@ -528,6 +963,7 @@ class SimpleGuardClient:
             "key_id": response.key_id,
             "public_key_pem": response.public_key_pem,
             "private_key_pem": response.private_key_pem,
+            "did_key": response.did_key,  # did:key URI (RFC-002 §6.1)
         }, None
     
     def load_key(self, file_path: str) -> tuple[Optional[dict], Optional[str]]:
@@ -624,6 +1060,17 @@ def _claims_to_dict(claims) -> dict:
     """Convert protobuf BadgeClaims to dict."""
     if claims is None:
         return {}
+    
+    # Map proto enum to human-readable trust level string
+    trust_level_map = {
+        0: "unspecified",  # TRUST_LEVEL_UNSPECIFIED
+        1: "0",  # TRUST_LEVEL_SELF_SIGNED (Level 0)
+        2: "1",  # TRUST_LEVEL_DV (Level 1)
+        3: "2",  # TRUST_LEVEL_OV (Level 2)
+        4: "3",  # TRUST_LEVEL_EV (Level 3)
+        5: "4",  # TRUST_LEVEL_CV (Level 4)
+    }
+    
     return {
         "jti": claims.jti,
         "iss": claims.iss,
@@ -631,7 +1078,7 @@ def _claims_to_dict(claims) -> dict:
         "iat": claims.iat,
         "exp": claims.exp,
         "aud": list(claims.aud),
-        "trust_level": claims.trust_level,
+        "trust_level": trust_level_map.get(claims.trust_level, str(claims.trust_level)),
         "domain": claims.domain,
         "agent_name": claims.agent_name,
     }

@@ -6,9 +6,15 @@ validation, signature verification, and protocol compliance checking.
 Example:
     >>> from capiscio_sdk import secure
     >>> agent = secure(MyAgentExecutor())
+    
+    >>> from capiscio_sdk.badge import verify_badge
+    >>> result = verify_badge(token, trusted_issuers=["https://registry.capisc.io"])
+    
+    >>> from capiscio_sdk import validate_agent_card
+    >>> result = validate_agent_card(card_dict)  # Uses Go core
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.1"
 
 # Core exports
 from .executor import CapiscioSecurityExecutor, secure, secure_agent
@@ -23,22 +29,57 @@ from .errors import (
 )
 from .types import ValidationResult, ValidationIssue, ValidationSeverity
 
+# Go core-backed validation (RECOMMENDED)
+from .validators import CoreValidator, validate_agent_card
+
+# Trust Badge API
+from .badge import (
+    verify_badge,
+    parse_badge,
+    request_badge,
+    request_badge_sync,
+    start_badge_keeper,
+    BadgeClaims,
+    VerifyOptions,
+    VerifyResult,
+    VerifyMode,
+    TrustLevel,
+)
+
 __all__ = [
     "__version__",
+    # Security middleware
     "CapiscioSecurityExecutor",
     "SimpleGuard",
     "secure",
     "secure_agent",
+    # Configuration
     "SecurityConfig",
     "DownstreamConfig",
     "UpstreamConfig",
+    # Errors
     "CapiscioSecurityError",
     "CapiscioValidationError",
     "CapiscioSignatureError",
     "CapiscioRateLimitError",
     "CapiscioUpstreamError",
+    # Types
     "ValidationResult",
     "ValidationIssue",
     "ValidationSeverity",
+    # Validation (Go core-backed)
+    "CoreValidator",
+    "validate_agent_card",
+    # Trust Badge API
+    "verify_badge",
+    "parse_badge",
+    "request_badge",
+    "request_badge_sync",
+    "start_badge_keeper",
+    "BadgeClaims",
+    "VerifyOptions",
+    "VerifyResult",
+    "VerifyMode",
+    "TrustLevel",
 ]
 

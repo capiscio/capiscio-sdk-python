@@ -99,7 +99,7 @@ pip install capiscio-sdk==0.1.0
 
 ### Added
 - **SimpleGuard Security Strategy**:
-  - **Identity**: Ed25519 JWS signature verification (`X-Capiscio-JWS` header).
+  - **Identity**: Ed25519 Trust Badge verification (`X-Capiscio-Badge` header per RFC-002 §9.1).
   - **Integrity**: SHA-256 Body Hash verification (`bh` claim) to prevent payload tampering.
   - **Freshness**: Replay protection using `exp` (expiration) and `iat` (issued at) claims with a 60-second window.
   - **Zero Config**: Secure by default with minimal setup.
