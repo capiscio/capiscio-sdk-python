@@ -2,15 +2,17 @@
 
 This section provides detailed API documentation for all public modules in the CapiscIO Python SDK.
 
-## Core Module
+## Core Exports
 
-::: capiscio_sdk.core
+::: capiscio_sdk
     options:
       members:
         - secure
         - secure_agent
-        - CapiscIOSecurityExecutor
+        - CapiscioSecurityExecutor
         - SecurityConfig
+        - SimpleGuard
+        - validate_agent_card
       show_root_heading: false
 
 ## Configuration
@@ -24,6 +26,15 @@ This section provides detailed API documentation for all public modules in the C
       show_root_heading: false
 
 ## Validators
+
+### Core Validator (Go-backed)
+
+::: capiscio_sdk.validators._core
+    options:
+      members:
+        - CoreValidator
+        - validate_agent_card
+      show_root_heading: false
 
 ### Message Validator
 
@@ -55,14 +66,14 @@ This section provides detailed API documentation for all public modules in the C
     options:
       show_root_heading: false
 
-## Models
+## Types
 
-::: capiscio_sdk.models
+::: capiscio_sdk.types
     options:
       show_root_heading: false
 
-## Exceptions
+## Errors
 
-::: capiscio_sdk.exceptions
+::: capiscio_sdk.errors
     options:
       show_root_heading: false
