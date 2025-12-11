@@ -59,6 +59,7 @@ nav:
       - Quick Start: getting-started/quickstart.md
       - Core Concepts: getting-started/concepts.md
   - Guides:
+      - Badge Verification: guides/badge-verification.md
       - Scoring System: guides/scoring.md
       - Configuration: guides/configuration.md
   - API Reference: api-reference.md
