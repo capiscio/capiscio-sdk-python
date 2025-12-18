@@ -227,6 +227,231 @@ claims = {
 }
 ```
 
+## 🔌 gRPC SDK Integration (All 7 Services)
+
+The SDK provides a comprehensive gRPC client that wraps all `capiscio-core` functionality. The client auto-starts the local gRPC server if needed.
+
+### Connection Modes
+
+```python
+from capiscio_sdk._rpc.client import CapiscioRPCClient
+
+# Auto-start mode (recommended for local development)
+client = CapiscioRPCClient()  # Auto-starts capiscio-core gRPC server
+client.connect()
+
+# Connect to existing Unix socket
+client = CapiscioRPCClient(address="unix:///tmp/capiscio.sock", auto_start=False)
+client.connect()
+
+# Connect to remote TCP server
+client = CapiscioRPCClient(address="localhost:50051", auto_start=False)
+client.connect()
+
+# Context manager (auto-cleanup)
+with CapiscioRPCClient() as client:
+    # Use client...
+    pass  # Automatically disconnects
+```
+
+### 1. BadgeService - Trust Badge Operations
+
+```python
+with CapiscioRPCClient() as client:
+    # Sign a badge
+    token, claims = client.badge.sign_badge(
+        claims={
+            "jti": "550e8400-e29b-41d4-a716-446655440000",
+            "iss": "https://registry.capisc.io",
+            "sub": "did:web:registry.capisc.io:agents:my-agent",
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 300,
+            "trust_level": "2"
+        },
+        private_key_jwk='{"kty":"OKP",...}',
+        key_id="key-1"
+    )
+
+    # Verify with full options
+    valid, claims, warnings, error = client.badge.verify_badge_with_options(
+        token,
+        accept_self_signed=True,
+        trusted_issuers=["https://registry.capisc.io"],
+        audience="my-service"
+    )
+
+    # Parse without verification
+    claims, error = client.badge.parse_badge(token)
+
+    # Request CA-signed badge
+    token, error = client.badge.request_badge(
+        agent_id="my-agent-123",
+        api_key="capi_key_...",
+        ca_url="https://registry.capisc.io"
+    )
+
+    # Start badge keeper (auto-renewal)
+    for event in client.badge.start_keeper(
+        private_key_jwk='{"kty":"OKP",...}',
+        subject="did:web:registry.capisc.io:agents:my-agent",
+        ca_url="https://registry.capisc.io",
+        ttl_seconds=300,
+        renew_before_seconds=60
+    ):
+        if event.event_type == "renewed":
+            print(f"Badge renewed: {event.badge_token}")
+```
+
+### 2. DIDService - DID Parsing
+
+```python
+with CapiscioRPCClient() as client:
+    # Parse did:web identifier
+    did_info, error = client.did.parse("did:web:registry.capisc.io:agents:my-agent")
+
+    if did_info:
+        print(f"Method: {did_info['method']}")          # "web"
+        print(f"Domain: {did_info['domain']}")          # "registry.capisc.io"
+        print(f"Path: {did_info['path']}")              # "agents/my-agent"
+        print(f"Document URL: {did_info['document_url']}")  # "https://registry.capisc.io/agents/my-agent/did.json"
+```
+
+### 3. TrustStoreService - Manage Trusted CA Keys
+
+```python
+with CapiscioRPCClient() as client:
+    # Add trusted CA key
+    kid, error = client.trust.add_key(
+        did="did:web:registry.capisc.io",
+        public_key=b'{"kty":"OKP",...}',
+        format="JWK"
+    )
+
+    print(f"Added key: {kid}")
+```
+
+### 4. RevocationService - Check Revocation Status
+
+```python
+with CapiscioRPCClient() as client:
+    # Check if badge is revoked
+    is_revoked = client.revocation.is_revoked("badge-jti-12345")
+
+    if is_revoked:
+        print("⚠️ Badge has been revoked!")
+```
+
+### 5. ScoringService - Agent Card Scoring
+
+```python
+with CapiscioRPCClient() as client:
+    # Score an agent card
+    result, error = client.scoring.score_agent_card(agent_card_json)
+
+    if result:
+        print(f"Overall Score: {result['overall_score']}/100")
+        print(f"Compliance: {result['compliance_score']}/100")
+        print(f"Trust: {result['trust_score']}/100")
+        print(f"Availability: {result['availability_score']}/100")
+
+    # Validate a specific rule
+    rule_result, error = client.scoring.validate_rule("rule-001", agent_card_json)
+
+    # List available rule sets
+    rule_sets, error = client.scoring.list_rule_sets()
+
+    # Get specific rule set
+    rule_set, error = client.scoring.get_rule_set("default")
+
+    # Aggregate multiple scores
+    aggregated, error = client.scoring.aggregate_scores(
+        results=[
+            {"overall_score": 85},
+            {"overall_score": 90},
+            {"overall_score": 88}
+        ],
+        method="average"  # or "min", "max"
+    )
+```
+
+### 6. SimpleGuardService - JWS Signing & Verification
+
+```python
+with CapiscioRPCClient() as client:
+    # Sign a payload
+    signature, error = client.simpleguard.sign(
+        payload=b"important message",
+        key_id="my-key-1"
+    )
+
+    # Verify a signature
+    valid, payload, error = client.simpleguard.verify(
+        signature=signature,
+        expected_payload=b"important message",
+        public_key_jwk='{"kty":"OKP",...}'
+    )
+
+    # Sign with attached payload (JWS Compact)
+    jws, error = client.simpleguard.sign_attached(
+        payload=b"message",
+        key_id="my-key-1"
+    )
+
+    # Verify attached signature
+    valid, payload, error = client.simpleguard.verify_attached(
+        jws=jws,
+        public_key_jwk='{"kty":"OKP",...}'
+    )
+
+    # Get key information
+    key_info, error = client.simpleguard.get_key_info("my-key-1")
+```
+
+### 7. RegistryService - Fetch Agent Cards
+
+```python
+with CapiscioRPCClient() as client:
+    # Get agent card by DID
+    agent_card, error = client.registry.get_agent(
+        did="did:web:registry.capisc.io:agents:my-agent"
+    )
+
+    if agent_card:
+        print(f"Agent Name: {agent_card['name']}")
+        print(f"URL: {agent_card['url']}")
+```
+
+### Process Manager
+
+The SDK includes automatic process management for the `capiscio-core` gRPC server:
+
+```python
+from capiscio_sdk._rpc.process import get_process_manager
+
+# Get singleton process manager
+pm = get_process_manager()
+
+# Ensure server is running (auto-starts if needed)
+address = pm.ensure_running(timeout=10.0)
+print(f"gRPC server running at: {address}")
+
+# Manually start server
+pm.start()
+
+# Stop server
+pm.stop()
+
+# Check if running
+if pm.is_running():
+    print("Server is running")
+```
+
+**Auto-Start Behavior:**
+- ✅ Automatically downloads `capiscio-core` binary if not found
+- ✅ Starts on Unix socket by default (`~/.capiscio/rpc.sock`)
+- ✅ Handles server crashes and restarts
+- ✅ Cleans up on process exit
+
 ## How It Works
 
 ### 1. The Handshake
