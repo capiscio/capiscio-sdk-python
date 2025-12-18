@@ -233,6 +233,6 @@ result = verify_badge(
 
 ## See Also
 
-- [RFC-002 Trust Badge Specification](https://github.com/capiscio/capiscio-rfcs/blob/main/rfcs/002-trust-badge.md)
+- [RFC-002 Trust Badge Specification](https://docs.capisc.io/rfcs/blob/main/rfcs/002-trust-badge.md)
 - [API Reference](../api-reference.md)
 - [Configuration Guide](./configuration.md)
