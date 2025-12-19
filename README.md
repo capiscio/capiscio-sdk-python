@@ -257,6 +257,8 @@ with CapiscioRPCClient() as client:
 ### 1. BadgeService - Trust Badge Operations
 
 ```python
+import time
+
 with CapiscioRPCClient() as client:
     # Sign a badge
     token, claims = client.badge.sign_badge(
