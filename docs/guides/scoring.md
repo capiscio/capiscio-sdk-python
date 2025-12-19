@@ -1,6 +1,6 @@
 # Using Scoring in Python
 
-> **Learn how to use the three-dimensional scoring system in A2A Security** - For the full scoring system reference, see the [**Unified Scoring Guide**](https://docs.capisc.io/guides/scoring-system/)
+> **Learn how to use the three-dimensional scoring system in A2A Security** - For the full scoring system reference, see the [**Scoring System Concepts**](https://docs.capisc.io/concepts/scoring/)
 
 ## Quick Overview
 
@@ -11,7 +11,7 @@ A2A Security uses a three-dimensional scoring system to evaluate agent cards:
 - **🚀 Availability (0-100)** - Operational readiness *(optional with live testing)*
 
 !!! tip "Complete Scoring Details"
-    This page focuses on **Python usage**. For the complete scoring system explanation, breakdowns, and calculations, see the [**Unified Scoring Guide**](https://docs.capisc.io/guides/scoring-system/).
+    This page focuses on **Python usage**. For the complete scoring system explanation, breakdowns, and calculations, see the [**Scoring System Concepts**](https://docs.capisc.io/concepts/scoring/).
 
 ---
 
@@ -326,7 +326,7 @@ def is_production_ready(result: ValidationResult) -> bool:
 
     Complete scoring system reference with all breakdowns, calculations, and rating thresholds.
 
-    [:octicons-arrow-right-24: View Complete Guide](https://docs.capisc.io/guides/scoring-system/)
+    [:octicons-arrow-right-24: View Complete Guide](https://docs.capisc.io/concepts/scoring/)
 
 -   **🔧 CapiscIO CLI Scoring**
 
@@ -356,4 +356,4 @@ def is_production_ready(result: ValidationResult) -> bool:
 
 ---
 
-**For complete scoring details**, see the [**Unified Scoring Guide**](https://docs.capisc.io/guides/scoring-system/).
+**For complete scoring details**, see the [**Scoring System Concepts**](https://docs.capisc.io/concepts/scoring/).
