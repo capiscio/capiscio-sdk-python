@@ -46,6 +46,9 @@ from .badge import (
     TrustLevel,
 )
 
+# Badge lifecycle management
+from .badge_keeper import BadgeKeeper, BadgeKeeperConfig
+
 __all__ = [
     "__version__",
     # Security middleware
@@ -81,5 +84,8 @@ __all__ = [
     "VerifyResult",
     "VerifyMode",
     "TrustLevel",
+    # Badge lifecycle management
+    "BadgeKeeper",
+    "BadgeKeeperConfig",
 ]
 
