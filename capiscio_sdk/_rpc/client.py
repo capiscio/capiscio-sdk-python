@@ -414,6 +414,74 @@ class BadgeClient:
         }
         return True, result, None
 
+    def request_pop_badge(
+        self,
+        agent_did: str,
+        private_key_jwk: str,
+        api_key: str,
+        ca_url: str = "",
+        ttl_seconds: int = 300,
+        audience: Optional[list[str]] = None,
+    ) -> tuple[bool, Optional[dict], Optional[str]]:
+        """Request a badge using Proof of Possession (RFC-003).
+        
+        This requests a badge using the PoP challenge-response protocol,
+        providing IAL-1 assurance with cryptographic key binding.
+        
+        Args:
+            agent_did: Agent DID (did:web:... or did:key:...)
+            private_key_jwk: Private key in JWK format (JSON string)
+            api_key: API key for authentication
+            ca_url: CA URL (default: https://registry.capisc.io)
+            ttl_seconds: Badge TTL in seconds (default: 300 per RFC-002)
+            audience: Optional audience restrictions
+            
+        Returns:
+            Tuple of (success, result_dict, error_message)
+            result_dict contains: token, jti, subject, trust_level, 
+                                 assurance_level, expires_at, cnf
+            
+        Example:
+            import json
+            
+            # Load private key
+            with open("private.jwk") as f:
+                private_key_jwk = json.dumps(json.load(f))
+            
+            success, result, error = client.badge.request_pop_badge(
+                agent_did="did:web:registry.capisc.io:agents:my-agent",
+                private_key_jwk=private_key_jwk,
+                api_key=os.environ["CAPISCIO_API_KEY"],
+            )
+            if success:
+                token = result["token"]
+                print(f"IAL-1 badge with cnf: {result['cnf']}")
+        """
+        request = badge_pb2.RequestPoPBadgeRequest(
+            agent_did=agent_did,
+            private_key_jwk=private_key_jwk,
+            ca_url=ca_url,
+            api_key=api_key,
+            ttl_seconds=ttl_seconds,
+            audience=audience or [],
+        )
+        
+        response = self._stub.RequestPoPBadge(request)
+        
+        if not response.success:
+            return False, None, response.error
+        
+        result = {
+            "token": response.token,
+            "jti": response.jti,
+            "subject": response.subject,
+            "trust_level": response.trust_level,
+            "assurance_level": response.assurance_level,
+            "expires_at": response.expires_at,
+            "cnf": dict(response.cnf),
+        }
+        return True, result, None
+
     def start_keeper(
         self,
         mode: str,
@@ -499,6 +567,168 @@ class BadgeClient:
         # Stream events from keeper
         for event in self._stub.StartKeeper(request):
             yield _keeper_event_to_dict(event)
+
+    def create_dv_order(
+        self,
+        domain: str,
+        challenge_type: str,
+        jwk: str,
+        ca_url: str = "",
+    ) -> tuple[bool, Optional[dict], Optional[str]]:
+        """Create a Domain Validated badge order (RFC-002 v1.2).
+        
+        Args:
+            domain: Domain to validate
+            challenge_type: Challenge type ('http-01' or 'dns-01')
+            jwk: Public key in JWK format (JSON string)
+            ca_url: CA URL (default: https://registry.capisc.io)
+            
+        Returns:
+            Tuple of (success, order_dict, error_message)
+            order_dict contains: order_id, domain, challenge_type, 
+                               challenge_token, status, validation_url, 
+                               dns_record, expires_at
+            
+        Example:
+            import json
+            
+            # Load public key
+            with open("public.jwk") as f:
+                jwk = json.dumps(json.load(f))
+            
+            success, order, error = client.badge.create_dv_order(
+                domain="example.com",
+                challenge_type="http-01",
+                jwk=jwk,
+            )
+            if success:
+                print(f"Order ID: {order['order_id']}")
+                print(f"Validation URL: {order['validation_url']}")
+        """
+        request = badge_pb2.CreateDVOrderRequest(
+            domain=domain,
+            challenge_type=challenge_type,
+            jwk=jwk,
+            ca_url=ca_url,
+        )
+        
+        response = self._stub.CreateDVOrder(request)
+        
+        if not response.success:
+            return False, None, response.error
+        
+        from datetime import datetime, timezone
+        
+        order = {
+            "order_id": response.order_id,
+            "domain": response.domain,
+            "challenge_type": response.challenge_type,
+            "challenge_token": response.challenge_token,
+            "status": response.status,
+            "validation_url": response.validation_url,
+            "dns_record": response.dns_record,
+            "expires_at": datetime.fromtimestamp(response.expires_at, timezone.utc).isoformat() if response.expires_at else "",
+        }
+        return True, order, None
+
+    def get_dv_order(
+        self,
+        order_id: str,
+        ca_url: str = "",
+    ) -> tuple[bool, Optional[dict], Optional[str]]:
+        """Get the status of a DV badge order (RFC-002 v1.2).
+        
+        Args:
+            order_id: Order ID from create_dv_order
+            ca_url: CA URL (default: https://registry.capisc.io)
+            
+        Returns:
+            Tuple of (success, order_dict, error_message)
+            order_dict contains: order_id, domain, challenge_type, 
+                               challenge_token, status, validation_url,
+                               dns_record, expires_at, finalized_at (optional)
+            
+        Example:
+            success, order, error = client.badge.get_dv_order(
+                order_id="550e8400-e29b-41d4-a716-446655440000",
+            )
+            if success:
+                print(f"Status: {order['status']}")
+                if order.get('finalized_at'):
+                    print(f"Finalized at: {order['finalized_at']}")
+        """
+        request = badge_pb2.GetDVOrderRequest(
+            order_id=order_id,
+            ca_url=ca_url,
+        )
+        
+        response = self._stub.GetDVOrder(request)
+        
+        if not response.success:
+            return False, None, response.error
+        
+        from datetime import datetime, timezone
+        
+        order = {
+            "order_id": response.order_id,
+            "domain": response.domain,
+            "challenge_type": response.challenge_type,
+            "challenge_token": response.challenge_token,
+            "status": response.status,
+            "validation_url": response.validation_url,
+            "dns_record": response.dns_record,
+            "expires_at": datetime.fromtimestamp(response.expires_at, timezone.utc).isoformat() if response.expires_at else "",
+        }
+        
+        if response.finalized_at:
+            order["finalized_at"] = datetime.fromtimestamp(response.finalized_at, timezone.utc).isoformat()
+        
+        return True, order, None
+
+    def finalize_dv_order(
+        self,
+        order_id: str,
+        ca_url: str = "",
+    ) -> tuple[bool, Optional[dict], Optional[str]]:
+        """Finalize a DV badge order and receive a grant (RFC-002 v1.2).
+        
+        Args:
+            order_id: Order ID from create_dv_order
+            ca_url: CA URL (default: https://registry.capisc.io)
+            
+        Returns:
+            Tuple of (success, grant_dict, error_message)
+            grant_dict contains: grant (JWT), expires_at
+            
+        Example:
+            success, grant, error = client.badge.finalize_dv_order(
+                order_id="550e8400-e29b-41d4-a716-446655440000",
+            )
+            if success:
+                print(f"Grant JWT: {grant['grant']}")
+                print(f"Expires at: {grant['expires_at']}")
+                
+                # Save grant for later use
+                with open("grant.jwt", "w") as f:
+                    f.write(grant['grant'])
+        """
+        request = badge_pb2.FinalizeDVOrderRequest(
+            order_id=order_id,
+            ca_url=ca_url,
+        )
+        
+        response = self._stub.FinalizeDVOrder(request)
+        
+        if not response.success:
+            return False, None, response.error
+        
+        from datetime import datetime, timezone
+        
+        grant = {
+            "grant": response.grant,
+            "expires_at": datetime.fromtimestamp(response.expires_at, timezone.utc).isoformat() if response.expires_at else "",
+        }
+        return True, grant, None
 
 
 def _keeper_event_to_dict(event) -> dict:

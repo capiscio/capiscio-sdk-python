@@ -497,6 +497,109 @@ def request_badge_sync(
         raise ValueError(f"Failed to request badge: {e}") from e
 
 
+async def request_pop_badge(
+    agent_did: str,
+    private_key_jwk: str,
+    *,
+    ca_url: str = "https://registry.capisc.io",
+    api_key: Optional[str] = None,
+    ttl_seconds: int = 300,
+    audience: Optional[List[str]] = None,
+    timeout: float = 30.0,
+) -> str:
+    """Request a Trust Badge using Proof of Possession (RFC-003).
+
+    This requests a badge using the PoP challenge-response protocol,
+    providing IAL-1 assurance with cryptographic key binding. The agent
+    must prove possession of the private key associated with their DID.
+
+    Uses the capiscio-core gRPC service for the actual PoP flow.
+
+    Args:
+        agent_did: The agent DID (did:web:... or did:key:...).
+        private_key_jwk: Private key in JWK format (JSON string).
+        ca_url: Certificate Authority URL (default: CapiscIO registry).
+        api_key: API key for authentication with the CA.
+        ttl_seconds: Requested badge TTL in seconds (default: 300).
+        audience: Optional audience restrictions for the badge.
+        timeout: Request timeout in seconds (not used with gRPC).
+
+    Returns:
+        The signed badge JWT token with IAL-1 assurance.
+
+    Raises:
+        ValueError: If the CA returns an error or PoP verification fails.
+
+    Example:
+        import json
+        
+        # Load private key
+        with open("private.jwk") as f:
+            private_key_jwk = json.dumps(json.load(f))
+        
+        token = await request_pop_badge(
+            agent_did="did:web:registry.capisc.io:agents:my-agent",
+            private_key_jwk=private_key_jwk,
+            ca_url="https://registry.capisc.io",
+            api_key=os.environ["CAPISCIO_API_KEY"],
+        )
+
+        # Verify the badge has IAL-1
+        claims = parse_badge(token)
+        # Note: IAL-1 badges have a 'cnf' claim with key binding
+    """
+    # Use sync version since gRPC client is sync
+    return request_pop_badge_sync(
+        agent_did,
+        private_key_jwk,
+        ca_url=ca_url,
+        api_key=api_key,
+        ttl_seconds=ttl_seconds,
+        audience=audience,
+        timeout=timeout,
+    )
+
+
+def request_pop_badge_sync(
+    agent_did: str,
+    private_key_jwk: str,
+    *,
+    ca_url: str = "https://registry.capisc.io",
+    api_key: Optional[str] = None,
+    ttl_seconds: int = 300,
+    audience: Optional[List[str]] = None,
+    timeout: float = 30.0,
+) -> str:
+    """Synchronous version of request_pop_badge.
+
+    Uses the capiscio-core gRPC service for the actual PoP flow.
+    See request_pop_badge for full documentation.
+    """
+    try:
+        client = _get_client()
+        success, result, error = client.badge.request_pop_badge(
+            agent_did=agent_did,
+            private_key_jwk=private_key_jwk,
+            api_key=api_key or "",
+            ca_url=ca_url,
+            ttl_seconds=ttl_seconds,
+            audience=audience,
+        )
+
+        if not success:
+            raise ValueError(f"PoP badge request failed: {error}")
+
+        token = result.get("token")
+        if not token:
+            raise ValueError("CA response missing token")
+
+        return token
+    except Exception as e:
+        if isinstance(e, ValueError):
+            raise
+        raise ValueError(f"Failed to request PoP badge: {e}") from e
+
+
 def start_badge_keeper(
     mode: str,
     *,

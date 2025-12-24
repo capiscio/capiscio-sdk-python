@@ -38,6 +38,8 @@ from .badge import (
     parse_badge,
     request_badge,
     request_badge_sync,
+    request_pop_badge,
+    request_pop_badge_sync,
     start_badge_keeper,
     BadgeClaims,
     VerifyOptions,
@@ -48,6 +50,15 @@ from .badge import (
 
 # Badge lifecycle management
 from .badge_keeper import BadgeKeeper, BadgeKeeperConfig
+
+# Domain Validation (DV) API
+from .dv import (
+    create_dv_order,
+    get_dv_order,
+    finalize_dv_order,
+    DVOrder,
+    DVGrant,
+)
 
 __all__ = [
     "__version__",
@@ -78,6 +89,8 @@ __all__ = [
     "parse_badge",
     "request_badge",
     "request_badge_sync",
+    "request_pop_badge",
+    "request_pop_badge_sync",
     "start_badge_keeper",
     "BadgeClaims",
     "VerifyOptions",
@@ -87,5 +100,11 @@ __all__ = [
     # Badge lifecycle management
     "BadgeKeeper",
     "BadgeKeeperConfig",
+    # Domain Validation (DV) API
+    "create_dv_order",
+    "get_dv_order",
+    "finalize_dv_order",
+    "DVOrder",
+    "DVGrant",
 ]
 

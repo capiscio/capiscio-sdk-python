@@ -57,3 +57,6 @@ pip-wheel-metadata/
 docs/_build/
 site/
 
+uv.lock
+agent-card.json
+capiscio_keys/

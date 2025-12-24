@@ -330,14 +330,16 @@ class SimpleGuard:
             
         if self.dev_mode:
             # Self-Trust: Load public key into gRPC server's trust store
+            # Use a different key_id for trust to avoid overwriting the signing key
             public_key_path = self.keys_dir / "public.pem"
-            self_trust_path = self.trusted_dir / f"{self.signing_kid}.pem"
+            trust_key_id = f"{self.signing_kid}-trust"
+            self_trust_path = self.trusted_dir / f"{trust_key_id}.pem"
             
             if public_key_path.exists() and not self_trust_path.exists():
                 import shutil
                 shutil.copy(public_key_path, self_trust_path)
-                logger.info(f"Dev Mode: Added self-trust for kid {self.signing_kid}")
+                logger.info(f"Dev Mode: Added self-trust for kid {trust_key_id}")
             
-            # Also load into gRPC server
+            # Also load into gRPC server for verification (not signing)
             if self_trust_path.exists():
                 self._client.simpleguard.load_key(str(self_trust_path))

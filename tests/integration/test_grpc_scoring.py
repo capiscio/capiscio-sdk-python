@@ -34,6 +34,7 @@ def server_health_check():
 class TestGRPCScoringService:
     """Test gRPC scoring service integration."""
 
+    @pytest.mark.skip(reason="AgentCardValidator deprecated - use CoreValidator with validate_agent_card()")
     def test_grpc_scoring_agent_card(self, server_health_check):
         """Test: Score agent card via gRPC."""
         from capiscio_sdk.validators import AgentCardValidator

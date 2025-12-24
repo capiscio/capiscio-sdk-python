@@ -82,6 +82,7 @@ class TestBadgeKeeperAutoRenewal:
             assert renewed_badge != initial_badge, "Badge should have renewed"
             print("✓ Badge renewed successfully")
 
+    @pytest.mark.skip(reason="Requires gRPC server running - BadgeKeeper connects via unix socket")
     def test_badge_keeper_handles_renewal_failure(self, server_health_check):
         """
         Test: BadgeKeeper handles renewal failures gracefully.

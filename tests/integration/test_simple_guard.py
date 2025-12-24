@@ -86,8 +86,11 @@ class TestSimpleGuardSignVerify:
         verified = guard.verify_inbound(token, body=body)
         
         assert verified is not None
-        assert verified.get("iss") == guard.agent_id
-        print(f"✓ SimpleGuard verified own signature: {verified.get('iss')}")
+        # Note: iss is in the JWS header, not the payload (per RFC-002)
+        # The payload contains bh (body hash), exp, iat
+        assert "bh" in verified  # Body hash should be present
+        assert "exp" in verified  # Expiration should be present
+        print(f"✓ SimpleGuard verified own signature")
         
         guard.close()
 
