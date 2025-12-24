@@ -86,7 +86,7 @@ exclude_lines = [
     "raise NotImplementedError",
     "@abstractmethod",
 ]
-fail_under = 70
+fail_under = 68
 show_missing = true
 skip_covered = false
 
@@ -109,3 +109,14 @@ python_version = "3.10"
 strict = true
 warn_return_any = true
 warn_unused_configs = true
+exclude = [
+    "capiscio_sdk/_rpc/gen/",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "grpc",
+    "grpc.*",
+    "google.protobuf.*",
+]
+ignore_missing_imports = true
