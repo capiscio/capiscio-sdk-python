@@ -58,7 +58,7 @@ jobs:
       - name: Run integration tests (server-independent only)
         run: |
           # Only run tests that don't require server connection
-          pytest tests/integration/ -v --tb=short -k "not server" --ignore=tests/integration/test_server_integration.py --ignore=tests/integration/test_dv_badge_flow.py --ignore=tests/integration/test_dv_order_api.py || true
+          pytest tests/integration/ -v --tb=short -k "not server" --ignore=tests/integration/test_server_integration.py --ignore=tests/integration/test_dv_badge_flow.py --ignore=tests/integration/test_dv_order_api.py
         continue-on-error: true
       
       - name: Upload coverage to Codecov

@@ -340,6 +340,7 @@ class SimpleGuard:
                 shutil.copy(public_key_path, self_trust_path)
                 logger.info(f"Dev Mode: Added self-trust for kid {trust_key_id}")
             
-            # Load into gRPC server for verification (key is already loaded for signing separately)
+            # Load into gRPC server trust store for verification
+            # (signing key is loaded separately during guard initialization)
             if self_trust_path.exists():
                 self._client.simpleguard.load_key(str(self_trust_path))

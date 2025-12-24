@@ -136,7 +136,7 @@ class TestDVOrderAPI:
         order_data = resp.json()
         
         assert order_data["challenge"]["type"] == "dns-01"
-        # Server uses _capiscio-challenge (not _acme-challenge)
+        # DNS-01 TXT record must be at _capiscio-challenge.<domain> (not ACME's _acme-challenge)
         assert "_capiscio-challenge.dns-example.com" in order_data["challenge"]["url"]
         
         print(f"✅ DNS-01 order created: {order_data['id']}")
