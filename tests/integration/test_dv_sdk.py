@@ -1,6 +1,5 @@
 """Integration tests for DV SDK high-level API."""
 
-import json
 import os
 
 import pytest

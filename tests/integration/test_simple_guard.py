@@ -68,7 +68,7 @@ class TestSimpleGuardSignVerify:
         
         assert token is not None
         # Token should include body hash in claims
-        print(f"✓ SimpleGuard signed with body binding")
+        print("✓ SimpleGuard signed with body binding")
         
         guard.close()
 
@@ -90,7 +90,7 @@ class TestSimpleGuardSignVerify:
         # The payload contains bh (body hash), exp, iat
         assert "bh" in verified  # Body hash should be present
         assert "exp" in verified  # Expiration should be present
-        print(f"✓ SimpleGuard verified own signature")
+        print("✓ SimpleGuard verified own signature")
         
         guard.close()
 
@@ -201,7 +201,7 @@ class TestSimpleGuardDevMode:
             # If it succeeds, agent_id should match
             # Note: SimpleGuard may still generate did:key in dev_mode
             # depending on implementation
-            print(f"✓ Initialized with explicit agent_id")
+            print("✓ Initialized with explicit agent_id")
             guard.close()
         except Exception as e:
             # Expected if agent doesn't exist

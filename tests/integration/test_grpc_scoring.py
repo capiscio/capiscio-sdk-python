@@ -57,7 +57,7 @@ class TestGRPCScoringService:
         assert hasattr(result, 'trust')
         assert hasattr(result, 'availability')
         
-        print(f"✓ gRPC scoring service validated agent card")
+        print("✓ gRPC scoring service validated agent card")
         print(f"  Compliance: {result.compliance.total if result.compliance else 'N/A'}")
         print(f"  Trust: {result.trust.total if result.trust else 'N/A'}")
         print(f"  Availability: {result.availability.total if result.availability else 'N/A'}")

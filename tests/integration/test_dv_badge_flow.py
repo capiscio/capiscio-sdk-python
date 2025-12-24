@@ -28,10 +28,8 @@ import hashlib
 import uuid as uuid_module
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from datetime import datetime, timedelta
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.backends import default_backend
 import jwt
 
 # Get API URL from environment
@@ -291,7 +289,7 @@ class TestDVBadgeFlow:
         verify_resp = requests.get(f"http://{test_domain}/.well-known/capiscio-challenge/{challenge_token}")
         assert verify_resp.status_code == 200, "Challenge file not accessible"
         assert verify_resp.text == challenge_content, "Challenge content mismatch"
-        print(f"✓ Challenge file verified")
+        print("✓ Challenge file verified")
         
         # Optional: Check order status
         status_resp = requests.get(
@@ -311,7 +309,7 @@ class TestDVBadgeFlow:
         
         assert "grant" in finalize_data
         dv_grant = finalize_data["grant"]
-        print(f"✓ Received DV grant (JWT)")
+        print("✓ Received DV grant (JWT)")
         
         # Decode grant to verify claims (without verification - just inspection)
         grant_claims = jwt.decode(dv_grant, options={"verify_signature": False})
@@ -350,7 +348,7 @@ class TestDVBadgeFlow:
         
         assert "badge" in mint_data
         badge_token = mint_data["badge"]
-        print(f"✓ Minted badge")
+        print("✓ Minted badge")
         
         # Step 5: Verify badge claims
         badge_claims = jwt.decode(badge_token, options={"verify_signature": False})
@@ -369,7 +367,7 @@ class TestDVBadgeFlow:
         assert 3500 < duration < 3700, f"Badge duration {duration}s not ~3600s"
         
         print(f"✓ Badge verified: trust_level={badge_claims['trust_level']}, ial={badge_claims['ial']}")
-        print(f"✅ HTTP-01 DV flow complete")
+        print("✅ HTTP-01 DV flow complete")
         
         # Cleanup
         del challenge_responses[challenge_token]
@@ -413,7 +411,7 @@ class TestDVBadgeFlow:
         
         assert finalize_resp.status_code == 200, f"DNS-01 finalization failed: {finalize_resp.text}"
         dv_grant = finalize_resp.json()["grant"]
-        print(f"✓ Received DNS-01 DV grant")
+        print("✓ Received DNS-01 DV grant")
         
         # Mint badge
         pop_proof = create_pop_proof(agent["did"], agent["private_key"], f"{API_BASE_URL}/v1/badges/mint", "POST")
@@ -433,7 +431,7 @@ class TestDVBadgeFlow:
         # Verify badge
         badge_claims = jwt.decode(badge_token, options={"verify_signature": False})
         assert badge_claims["trust_level"] == "2"
-        print(f"✅ DNS-01 DV flow complete")
+        print("✅ DNS-01 DV flow complete")
     
     @pytest.mark.skip(reason="Requires HTTP-01 validation on non-localhost domain - integration needs mock")
     def test_dv_grant_status_with_pop_auth(self, dv_test_agent):
@@ -482,7 +480,7 @@ class TestDVBadgeFlow:
         assert "status" in status_data
         assert status_data["status"] in ["active", "revoked"]
         print(f"✓ Grant status: {status_data['status']}")
-        print(f"✅ Grant status query with PoP auth successful")
+        print("✅ Grant status query with PoP auth successful")
     
     @pytest.mark.skip(reason="Requires HTTP-01 validation on non-localhost domain - integration needs mock")
     def test_dv_grant_revocation(self, dv_test_agent):
@@ -525,7 +523,7 @@ class TestDVBadgeFlow:
             }
         )
         assert mint_resp1.status_code == 200, "Initial badge minting should succeed"
-        print(f"✓ Initial badge minting successful")
+        print("✓ Initial badge minting successful")
         
         # Revoke the grant
         revoke_htu = f"{API_BASE_URL}/v1/badges/dv/grants/{grant_jti}/revoke"
@@ -538,7 +536,7 @@ class TestDVBadgeFlow:
         )
         
         assert revoke_resp.status_code == 200, f"Grant revocation failed: {revoke_resp.text}"
-        print(f"✓ Grant revoked successfully")
+        print("✓ Grant revoked successfully")
         
         # Attempt to mint badge with revoked grant
         pop_proof2 = create_pop_proof(agent["did"], agent["private_key"], f"{API_BASE_URL}/v1/badges/mint", "POST")
@@ -553,8 +551,8 @@ class TestDVBadgeFlow:
         
         # Should fail (403 or 400)
         assert mint_resp2.status_code in [400, 403], f"Minting with revoked grant should fail, got {mint_resp2.status_code}"
-        print(f"✓ Badge minting with revoked grant correctly rejected")
-        print(f"✅ Grant revocation flow complete")
+        print("✓ Badge minting with revoked grant correctly rejected")
+        print("✅ Grant revocation flow complete")
     
     @pytest.mark.skip(reason="Requires HTTP-01 validation on non-localhost domain - integration needs mock")
     def test_pop_auth_failure_for_grant_management(self, dv_test_agent):
@@ -591,7 +589,7 @@ class TestDVBadgeFlow:
             f"{API_BASE_URL}/v1/badges/dv/grants/{grant_jti}/status"
         )
         assert status_resp1.status_code == 401, "Missing PoP proof should return 401"
-        print(f"✓ Missing PoP proof correctly rejected (401)")
+        print("✓ Missing PoP proof correctly rejected (401)")
         
         # Test 2: Invalid PoP proof (malformed JWT)
         status_resp2 = requests.get(
@@ -599,7 +597,7 @@ class TestDVBadgeFlow:
             headers={"Authorization": "Bearer invalid.jwt.token"}
         )
         assert status_resp2.status_code in [401, 403], "Invalid PoP proof should return 401/403"
-        print(f"✓ Invalid PoP proof correctly rejected")
+        print("✓ Invalid PoP proof correctly rejected")
         
         # Test 3: PoP proof with wrong key
         # Generate a different key
@@ -616,9 +614,9 @@ class TestDVBadgeFlow:
             headers={"Authorization": f"Bearer {wrong_proof}"}
         )
         assert status_resp3.status_code in [401, 403], "Wrong key PoP proof should return 401/403"
-        print(f"✓ Wrong key PoP proof correctly rejected")
+        print("✓ Wrong key PoP proof correctly rejected")
         
-        print(f"✅ PoP authentication failure tests passed")
+        print("✅ PoP authentication failure tests passed")
     
     @pytest.mark.skip(reason="Requires HTTP-01 validation on non-localhost domain - integration needs mock")
     def test_key_thumbprint_mismatch(self, dv_test_agent):
@@ -669,5 +667,5 @@ class TestDVBadgeFlow:
         
         # Should fail due to key thumbprint mismatch
         assert mint_resp.status_code in [400, 403], f"Key thumbprint mismatch should fail, got {mint_resp.status_code}"
-        print(f"✓ Key thumbprint mismatch correctly rejected")
-        print(f"✅ Key thumbprint validation passed")
+        print("✓ Key thumbprint mismatch correctly rejected")
+        print("✅ Key thumbprint validation passed")

@@ -17,10 +17,7 @@ import os
 import pytest
 import requests
 import time
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from capiscio_sdk.badge import verify_badge, parse_badge
-from capiscio_sdk.badge_keeper import BadgeKeeper
-from capiscio_sdk.errors import CapiscioSecurityError
+from capiscio_sdk.badge import parse_badge
 
 # Get API URL from environment
 API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8080")
@@ -100,121 +97,6 @@ def register_test_agent():
     return _register
 
 
-@pytest.mark.skip(reason="BadgeClient class not exported - tests need refactor to use DV flow")
-class TestBadgeClientIntegration:
-    """Integration tests for BadgeClient against live server."""
-
-    def test_request_badge_success(self, server_health_check, test_api_key):
-        """Test: Request badge from live server successfully."""
-        client = BadgeClient(
-            registry_url=API_BASE_URL,
-            api_key=test_api_key
-        )
-
-        try:
-            result = client.request_badge(
-                agent_id="test-agent-sdk-001",
-                domain="sdk-test.example.com",
-                ttl=300  # 5 minutes
-            )
-
-            assert result is not None
-            assert "token" in result
-            assert "jti" in result
-            assert result["jti"] != ""
-            print(f"✓ Issued badge: JTI={result['jti']}")
-
-        except CapiscioError as e:
-            # If agent doesn't exist, that's expected
-            if "not found" in str(e).lower():
-                pytest.skip("Test agent not registered - expected in initial setup")
-            else:
-                raise
-
-    def test_request_badge_invalid_api_key(self, server_health_check):
-        """Test: Invalid API key is rejected."""
-        client = BadgeClient(
-            registry_url=API_BASE_URL,
-            api_key="invalid-key-12345"
-        )
-
-        with pytest.raises(CapiscioError) as exc_info:
-            client.request_badge(
-                agent_id="test-agent-001",
-                domain="test.example.com"
-            )
-
-        # Should get authentication error
-        assert "auth" in str(exc_info.value).lower() or "unauthorized" in str(exc_info.value).lower()
-        print(f"✓ Invalid API key correctly rejected: {exc_info.value}")
-
-    def test_request_badge_nonexistent_agent(self, server_health_check, test_api_key):
-        """Test: Nonexistent agent returns 404."""
-        client = BadgeClient(
-            registry_url=API_BASE_URL,
-            api_key=test_api_key
-        )
-
-        with pytest.raises(CapiscioError) as exc_info:
-            client.request_badge(
-                agent_id="nonexistent-agent-999",
-                domain="test.example.com"
-            )
-
-        # Should get not found error
-        error_msg = str(exc_info.value).lower()
-        assert "not found" in error_msg or "404" in error_msg
-        print(f"✓ Nonexistent agent correctly rejected: {exc_info.value}")
-
-
-@pytest.mark.skip(reason="BadgeVerifier class not exported - tests need refactor to use verify_badge()")
-class TestBadgeVerifierIntegration:
-    """Integration tests for BadgeVerifier against live server."""
-
-    @pytest.mark.skip(reason="Requires valid badge from server - implement after agent setup")
-    def test_verify_badge_success(self, server_health_check, test_api_key):
-        """Test: Verify badge against live JWKS."""
-        # Step 1: Issue badge
-        client = BadgeClient(
-            registry_url=API_BASE_URL,
-            api_key=test_api_key
-        )
-        
-        result = client.request_badge(
-            agent_id="test-agent-verifier",
-            domain="verify-sdk.example.com"
-        )
-        
-        badge_token = result["token"]
-
-        # Step 2: Verify badge
-        verifier = BadgeVerifier(registry_url=API_BASE_URL)
-        claims = verifier.verify(badge_token)
-
-        assert claims is not None
-        assert claims["jti"] == result["jti"]
-        assert claims["sub"] == result["subject"]
-        print(f"✓ Verified badge: {claims['jti']}")
-
-    def test_verify_invalid_token(self, server_health_check):
-        """Test: Invalid token is rejected."""
-        verifier = BadgeVerifier(registry_url=API_BASE_URL)
-
-        with pytest.raises(CapiscioError):
-            verifier.verify("invalid.token.here")
-
-        print("✓ Invalid token correctly rejected")
-
-    def test_verify_malformed_token(self, server_health_check):
-        """Test: Malformed token is rejected."""
-        verifier = BadgeVerifier(registry_url=API_BASE_URL)
-
-        with pytest.raises(CapiscioError):
-            verifier.verify("not-even-a-jwt")
-
-        print("✓ Malformed token correctly rejected")
-
-
 class TestPoPIntegration:
     """Integration tests for PoP protocol (RFC-003)."""
 
@@ -274,7 +156,6 @@ class TestPoPIntegration:
         assert len(token.split('.')) == 3
         
         # Parse and verify claims
-        from capiscio_sdk.badge import parse_badge
         claims = parse_badge(token)
         
         # Verify IAL-1 badge characteristics
@@ -335,7 +216,6 @@ class TestPoPIntegration:
         
         # Verify badge
         assert token
-        from capiscio_sdk.badge import parse_badge
         claims = parse_badge(token)
         assert claims.subject == did_key
         

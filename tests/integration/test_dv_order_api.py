@@ -196,7 +196,7 @@ class TestDVOrderAPI:
             if resp.status_code not in [200, 201, 400, 422]:
                 assert False, f"Unexpected status code {resp.status_code} for domain '{invalid_domain}'"
         
-        print(f"✅ Domain validation test complete (SSRF catches bad domains at finalization)")
+        print("✅ Domain validation test complete (SSRF catches bad domains at finalization)")
     
     def test_create_order_invalid_challenge_type(self, server_health_check, test_jwk):
         """Test that invalid challenge types are rejected."""
@@ -211,7 +211,7 @@ class TestDVOrderAPI:
         )
         
         assert resp.status_code in [400, 422], "Invalid challenge type should be rejected"
-        print(f"✅ Invalid challenge type correctly rejected")
+        print("✅ Invalid challenge type correctly rejected")
     
     def test_create_order_missing_jwk(self, server_health_check):
         """Test that orders without JWK are rejected."""
@@ -226,7 +226,7 @@ class TestDVOrderAPI:
         )
         
         assert resp.status_code in [400, 422], "Order without JWK should be rejected"
-        print(f"✅ Missing JWK correctly rejected")
+        print("✅ Missing JWK correctly rejected")
     
     def test_create_order_anonymous(self, test_jwk):
         """Test that DV orders can be created anonymously (per RFC-002 v1.2 Anonymous DV)."""
@@ -256,7 +256,7 @@ class TestDVOrderAPI:
         )
         
         assert resp.status_code == 404, "Non-existent order should return 404"
-        print(f"✅ Non-existent order correctly returned 404")
+        print("✅ Non-existent order correctly returned 404")
     
     def test_finalize_order_without_validation(self, server_health_check, test_jwk):
         """
@@ -288,7 +288,7 @@ class TestDVOrderAPI:
         assert "error" in error_data
         assert error_data["error"] == "CHALLENGE_FAILED"
         
-        print(f"✅ Finalization without validation correctly rejected (expected)")
+        print("✅ Finalization without validation correctly rejected (expected)")
 
 
 if __name__ == "__main__":
