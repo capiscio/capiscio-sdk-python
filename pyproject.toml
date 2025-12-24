@@ -73,7 +73,7 @@ python_functions = ["test_*"]
 [tool.coverage.run]
 source = ["capiscio_sdk"]
 omit = [
-    "capiscio_sdk/_rpc/gen/*",
+    "capiscio_sdk/_rpc/*",
     "*/__pycache__/*",
     "*/tests/*",
 ]
@@ -86,7 +86,7 @@ exclude_lines = [
     "raise NotImplementedError",
     "@abstractmethod",
 ]
-fail_under = 68
+fail_under = 70
 show_missing = true
 skip_covered = false
 
