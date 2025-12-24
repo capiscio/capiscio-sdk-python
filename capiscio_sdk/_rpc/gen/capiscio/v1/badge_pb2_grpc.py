@@ -40,6 +40,26 @@ class BadgeServiceStub(object):
                 request_serializer=capiscio_dot_v1_dot_badge__pb2.RequestBadgeRequest.SerializeToString,
                 response_deserializer=capiscio_dot_v1_dot_badge__pb2.RequestBadgeResponse.FromString,
                 _registered_method=True)
+        self.RequestPoPBadge = channel.unary_unary(
+                '/capiscio.v1.BadgeService/RequestPoPBadge',
+                request_serializer=capiscio_dot_v1_dot_badge__pb2.RequestPoPBadgeRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_badge__pb2.RequestPoPBadgeResponse.FromString,
+                _registered_method=True)
+        self.CreateDVOrder = channel.unary_unary(
+                '/capiscio.v1.BadgeService/CreateDVOrder',
+                request_serializer=capiscio_dot_v1_dot_badge__pb2.CreateDVOrderRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_badge__pb2.CreateDVOrderResponse.FromString,
+                _registered_method=True)
+        self.GetDVOrder = channel.unary_unary(
+                '/capiscio.v1.BadgeService/GetDVOrder',
+                request_serializer=capiscio_dot_v1_dot_badge__pb2.GetDVOrderRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_badge__pb2.GetDVOrderResponse.FromString,
+                _registered_method=True)
+        self.FinalizeDVOrder = channel.unary_unary(
+                '/capiscio.v1.BadgeService/FinalizeDVOrder',
+                request_serializer=capiscio_dot_v1_dot_badge__pb2.FinalizeDVOrderRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_badge__pb2.FinalizeDVOrderResponse.FromString,
+                _registered_method=True)
         self.StartKeeper = channel.unary_stream(
                 '/capiscio.v1.BadgeService/StartKeeper',
                 request_serializer=capiscio_dot_v1_dot_badge__pb2.StartKeeperRequest.SerializeToString,
@@ -87,6 +107,35 @@ class BadgeServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RequestPoPBadge(self, request, context):
+        """Request a badge using Proof of Possession (RFC-003)
+        This provides IAL-1 assurance with cryptographic key binding
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateDVOrder(self, request, context):
+        """Create a Domain Validated (DV) badge order (RFC-002 v1.2)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetDVOrder(self, request, context):
+        """Get DV order status
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def FinalizeDVOrder(self, request, context):
+        """Finalize DV order and receive grant
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def StartKeeper(self, request, context):
         """Start a badge keeper that automatically renews badges (RFC-002 §7.3)
         Returns a stream of keeper events (started, renewed, error, stopped)
@@ -122,6 +171,26 @@ def add_BadgeServiceServicer_to_server(servicer, server):
                     servicer.RequestBadge,
                     request_deserializer=capiscio_dot_v1_dot_badge__pb2.RequestBadgeRequest.FromString,
                     response_serializer=capiscio_dot_v1_dot_badge__pb2.RequestBadgeResponse.SerializeToString,
+            ),
+            'RequestPoPBadge': grpc.unary_unary_rpc_method_handler(
+                    servicer.RequestPoPBadge,
+                    request_deserializer=capiscio_dot_v1_dot_badge__pb2.RequestPoPBadgeRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_badge__pb2.RequestPoPBadgeResponse.SerializeToString,
+            ),
+            'CreateDVOrder': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateDVOrder,
+                    request_deserializer=capiscio_dot_v1_dot_badge__pb2.CreateDVOrderRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_badge__pb2.CreateDVOrderResponse.SerializeToString,
+            ),
+            'GetDVOrder': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetDVOrder,
+                    request_deserializer=capiscio_dot_v1_dot_badge__pb2.GetDVOrderRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_badge__pb2.GetDVOrderResponse.SerializeToString,
+            ),
+            'FinalizeDVOrder': grpc.unary_unary_rpc_method_handler(
+                    servicer.FinalizeDVOrder,
+                    request_deserializer=capiscio_dot_v1_dot_badge__pb2.FinalizeDVOrderRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_badge__pb2.FinalizeDVOrderResponse.SerializeToString,
             ),
             'StartKeeper': grpc.unary_stream_rpc_method_handler(
                     servicer.StartKeeper,
@@ -265,6 +334,114 @@ class BadgeService(object):
             '/capiscio.v1.BadgeService/RequestBadge',
             capiscio_dot_v1_dot_badge__pb2.RequestBadgeRequest.SerializeToString,
             capiscio_dot_v1_dot_badge__pb2.RequestBadgeResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RequestPoPBadge(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.BadgeService/RequestPoPBadge',
+            capiscio_dot_v1_dot_badge__pb2.RequestPoPBadgeRequest.SerializeToString,
+            capiscio_dot_v1_dot_badge__pb2.RequestPoPBadgeResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateDVOrder(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.BadgeService/CreateDVOrder',
+            capiscio_dot_v1_dot_badge__pb2.CreateDVOrderRequest.SerializeToString,
+            capiscio_dot_v1_dot_badge__pb2.CreateDVOrderResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetDVOrder(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.BadgeService/GetDVOrder',
+            capiscio_dot_v1_dot_badge__pb2.GetDVOrderRequest.SerializeToString,
+            capiscio_dot_v1_dot_badge__pb2.GetDVOrderResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def FinalizeDVOrder(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.BadgeService/FinalizeDVOrder',
+            capiscio_dot_v1_dot_badge__pb2.FinalizeDVOrderRequest.SerializeToString,
+            capiscio_dot_v1_dot_badge__pb2.FinalizeDVOrderResponse.FromString,
             options,
             channel_credentials,
             insecure,
