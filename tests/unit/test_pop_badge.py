@@ -2,7 +2,7 @@
 
 import json
 import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import patch, MagicMock
 
 from capiscio_sdk.badge import request_pop_badge_sync, request_pop_badge
 

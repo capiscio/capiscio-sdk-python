@@ -66,14 +66,10 @@ class TestGRPCScoringService:
         """Test: gRPC client can connect to service."""
         from capiscio_sdk._rpc.client import CapiscioRPCClient
         
-        client = CapiscioRPCClient(address=GRPC_ADDRESS)
-        
-        try:
+        with CapiscioRPCClient(address=GRPC_ADDRESS) as client:
             client.connect()
             assert client.scoring is not None
             print(f"✓ gRPC client connected to {GRPC_ADDRESS}")
-        finally:
-            client.close()
 
     @pytest.mark.skip(reason="Requires gRPC server running")
     def test_grpc_scoring_invalid_card(self, server_health_check):

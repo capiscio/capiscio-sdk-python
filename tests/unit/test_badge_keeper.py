@@ -7,8 +7,7 @@ They test configuration, API contracts, and basic lifecycle management.
 
 import pytest
 import threading
-import time
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from capiscio_sdk.badge_keeper import BadgeKeeper, BadgeKeeperConfig
 
 

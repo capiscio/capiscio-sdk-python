@@ -4,6 +4,3 @@ pytest-asyncio>=0.21.0
 requests>=2.31.0
 cryptography>=41.0.0
 pyjwt>=2.8.0
-
-# A2A SDK for agent execution
-a2a-sdk>=0.1.0
