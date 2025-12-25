@@ -59,13 +59,13 @@ jobs:
         working-directory: capiscio-sdk-python/tests/integration
         run: |
           # Start postgres + server
-          docker-compose up -d db server
+          docker compose up -d db server
           
           # Wait for server to be healthy
           echo "Waiting for server to be healthy..."
-          timeout 60 bash -c 'until docker-compose exec -T server wget --quiet --tries=1 --spider http://localhost:8080/health; do sleep 2; done' || {
+          timeout 60 bash -c 'until docker compose exec -T server wget --quiet --tries=1 --spider http://localhost:8080/health; do sleep 2; done' || {
             echo "Server health check failed"
-            docker-compose logs server
+            docker compose logs server
             exit 1
           }
           
@@ -76,7 +76,7 @@ jobs:
         env:
           API_BASE_URL: http://server:8080
         run: |
-          docker-compose run --rm test-runner pytest tests/integration/ \
+          docker compose run --rm test-runner pytest tests/integration/ \
             --ignore=tests/integration/test_dv_badge_flow.py \
             --ignore=tests/integration/test_dv_order_api.py \
             -v --tb=short --junit-xml=/workspace/test-results.xml
@@ -93,17 +93,17 @@ jobs:
         working-directory: capiscio-sdk-python/tests/integration
         run: |
           echo "=== Server logs ==="
-          docker-compose logs server
+          docker compose logs server
           echo "=== Database logs ==="
-          docker-compose logs db
+          docker compose logs db
           echo "=== Test runner logs ==="
-          docker-compose logs test-runner
+          docker compose logs test-runner
       
       - name: Cleanup
         if: always()
         working-directory: capiscio-sdk-python/tests/integration
         run: |
-          docker-compose down -v
+          docker compose down -v
   
   # Optional: Test with long-running tests (badge keeper auto-renewal)
   long-integration-tests:
@@ -141,8 +141,8 @@ jobs:
       - name: Start test infrastructure
         working-directory: capiscio-sdk-python/tests/integration
         run: |
-          docker-compose up -d db server
-          timeout 60 bash -c 'until docker-compose exec -T server wget --quiet --tries=1 --spider http://localhost:8080/health; do sleep 2; done'
+          docker compose up -d db server
+          timeout 60 bash -c 'until docker compose exec -T server wget --quiet --tries=1 --spider http://localhost:8080/health; do sleep 2; done'
       
       - name: Run long integration tests
         working-directory: capiscio-sdk-python/tests/integration
@@ -150,13 +150,13 @@ jobs:
           RUN_LONG_TESTS: "1"
           API_BASE_URL: http://server:8080
         run: |
-          docker-compose run --rm test-runner pytest tests/integration/ \
+          docker compose run --rm test-runner pytest tests/integration/ \
             -v --tb=short -k "long"
       
       - name: Cleanup
         if: always()
         working-directory: capiscio-sdk-python/tests/integration
-        run: docker-compose down -v
+        run: docker compose down -v
   
   summary:
     name: Integration Tests Summary
