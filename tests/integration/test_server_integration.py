@@ -255,29 +255,141 @@ class TestPoPIntegration:
 class TestSimpleGuardIntegration:
     """Integration tests for SimpleGuard validation."""
 
-    @pytest.mark.skip(reason="Requires SimpleGuard server validation - implement after setup")
-    def test_simpleguard_sign_and_verify(self, server_health_check):
-        """Test: SimpleGuard signs message and server verifies."""
-        # TODO: Implement SimpleGuard integration test
-        # 1. Initialize SimpleGuard with agent keys
-        # 2. Sign outbound message
-        # 3. Send to server for verification
-        # 4. Verify server accepts signature
-        pass
+    def test_simpleguard_sign_and_server_validates(self, server_health_check):
+        """Test: SimpleGuard signs message and server validates structure."""
+        from capiscio_sdk.simple_guard import SimpleGuard
+        
+        # Create SimpleGuard in dev mode (auto-generates did:key)
+        guard = SimpleGuard(dev_mode=True)
+        
+        # Create signed message
+        payload = {"sub": guard.agent_id, "msg": "test"}
+        headers = guard.make_headers(payload)
+        
+        # Send to server validation endpoint
+        resp = requests.post(
+            f"{API_BASE_URL}/v1/validate",
+            headers=headers,
+            json={"test": "data"}
+        )
+        
+        # Server should process the badge (may reject if self-signed, but validates structure)
+        assert resp.status_code in [200, 401, 403], f"Unexpected status: {resp.status_code}"
+        result = resp.json()
+        
+        # Either valid or structured error response
+        if resp.status_code == 200:
+            assert result.get("valid") is True
+            print("✓ Server validated SimpleGuard badge")
+        else:
+            # Expected: signature/issuer rejection
+            assert "error_code" in result or "error" in result
+            print(f"✓ Server processed badge (rejected as expected: {result.get('error_code', 'UNKNOWN')})")
+        
+        guard.close()
+    
+    def test_simpleguard_with_body_hash(self, server_health_check):
+        """Test: SimpleGuard creates badge with body hash binding."""
+        from capiscio_sdk.simple_guard import SimpleGuard
+        
+        guard = SimpleGuard(dev_mode=True)
+        
+        # Create payload and body
+        payload = {"sub": guard.agent_id}
+        body = b"test request body"
+        
+        # Sign with body binding
+        token = guard.sign_outbound(payload, body=body)
+        
+        # Verify locally first
+        verified = guard.verify_inbound(token, body=body)
+        assert "bh" in verified  # Body hash should be present
+        
+        print("✓ SimpleGuard body hash binding works")
+        guard.close()
 
 
 class TestBadgeKeeperIntegration:
     """Integration tests for BadgeKeeper auto-renewal."""
 
-    @pytest.mark.skip(reason="Requires BadgeKeeper implementation - implement after Task 10")
-    def test_badge_keeper_auto_renewal(self, server_health_check, test_api_key):
-        """Test: BadgeKeeper automatically renews expiring badges."""
-        # TODO: Implement BadgeKeeper integration test
-        # 1. Issue badge with short TTL
-        # 2. Start BadgeKeeper
-        # 3. Wait for expiry
-        # 4. Verify badge is auto-renewed
-        pass
+    def test_badge_keeper_initialization(self, server_health_check):
+        """Test: BadgeKeeper initializes correctly."""
+        from capiscio_sdk import BadgeKeeper
+        
+        # Test initialization with minimal config
+        keeper = BadgeKeeper(
+            api_url=API_BASE_URL,
+            api_key="test-key",
+            agent_id="test-agent",
+            renewal_threshold=10,
+        )
+        
+        assert not keeper.is_running()
+        assert keeper.get_current_badge() is None
+        print("✓ BadgeKeeper initialization works")
+    
+    def test_badge_keeper_context_manager(self, server_health_check):
+        """Test: BadgeKeeper works as context manager."""
+        from capiscio_sdk import BadgeKeeper
+        
+        keeper = BadgeKeeper(
+            api_url=API_BASE_URL,
+            api_key="test-key",
+            agent_id="test-agent",
+        )
+        
+        assert not keeper.is_running()
+        
+        with keeper:
+            assert keeper.is_running()
+        
+        assert not keeper.is_running()
+        print("✓ BadgeKeeper context manager works")
+    
+    @pytest.mark.skipif(
+        not os.getenv("RUN_LONG_TESTS"),
+        reason="Long test - set RUN_LONG_TESTS=1 to enable"
+    )
+    def test_badge_keeper_auto_renewal_long(self, server_health_check, test_api_key, register_test_agent):
+        """Test: BadgeKeeper automatically renews expiring badges (60s test)."""
+        from capiscio_sdk import BadgeKeeper
+        import time
+        
+        # Note: This test takes 60+ seconds to complete
+        # Register test agent
+        test_did = "did:web:example.com:agents:test-badge-keeper"
+        register_test_agent(test_did, "BadgeKeeper Test Agent")
+        
+        renewed_tokens = []
+        
+        def on_renew_callback(token: str):
+            renewed_tokens.append(token)
+            print(f"✓ Badge renewed at {len(renewed_tokens)} time(s)")
+        
+        keeper = BadgeKeeper(
+            api_url=API_BASE_URL,
+            api_key=test_api_key,
+            agent_id=test_did,
+            ttl_seconds=60,
+            renewal_threshold=10,  # Renew 10s before expiry
+            check_interval=5,
+            on_renew=on_renew_callback,
+        )
+        
+        with keeper:
+            time.sleep(2)
+            initial_badge = keeper.get_current_badge()
+            assert initial_badge is not None, "Should have initial badge"
+            
+            # Wait for renewal (should happen around 50s mark)
+            print("Waiting for badge renewal (this takes ~55 seconds)...")
+            time.sleep(55)
+            
+            renewed_badge = keeper.get_current_badge()
+            assert renewed_badge != initial_badge, "Badge should have renewed"
+            assert len(renewed_tokens) > 0, "Should have called on_renew callback"
+        
+        print(f"✓ BadgeKeeper auto-renewal works ({len(renewed_tokens)} renewals)")
 
 
 # Utility tests
