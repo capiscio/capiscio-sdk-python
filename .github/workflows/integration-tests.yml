@@ -75,7 +75,6 @@ jobs:
         working-directory: capiscio-sdk-python/tests/integration
         env:
           API_BASE_URL: http://server:8080
-          PYTEST_ARGS: "-v --tb=short --junit-xml=test-results.xml"
         run: |
           docker-compose run --rm test-runner pytest tests/integration/ \
             --ignore=tests/integration/test_dv_badge_flow.py \
@@ -87,7 +86,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: integration-test-results
-          path: capiscio-sdk-python/test-results.xml
+          path: test-results.xml
       
       - name: Show logs on failure
         if: failure()
@@ -128,6 +127,16 @@ jobs:
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+      
+      - name: Build capiscio-server Docker image
+        working-directory: capiscio-server
+        run: |
+          docker build -t capiscio-server:test -f Dockerfile .
+      
+      - name: Build SDK test runner image
+        working-directory: capiscio-sdk-python/tests/integration
+        run: |
+          docker build -t sdk-test-runner:latest -f Dockerfile.test ../..
       
       - name: Start test infrastructure
         working-directory: capiscio-sdk-python/tests/integration

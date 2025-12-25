@@ -99,4 +99,4 @@ def test_grpc_scoring_implementation_exists(server_health_check):
     print("✓ CoreValidator implementation exists")
     
     # Note: Actual scoring requires capiscio-core daemon running via unix socket
-    # These tests verify the SDK has the infrastructure in plac
+    # These tests verify the SDK has the infrastructure in place
