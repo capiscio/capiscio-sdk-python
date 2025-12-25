@@ -87,6 +87,7 @@ jobs:
         with:
           name: integration-test-results
           path: test-results.xml
+          token: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Show logs on failure
         if: failure()
