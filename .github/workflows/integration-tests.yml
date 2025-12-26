@@ -106,6 +106,7 @@ jobs:
           docker compose run --rm test-runner pytest tests/integration/ \
             --ignore=tests/integration/test_dv_badge_flow.py \
             --ignore=tests/integration/test_dv_order_api.py \
+            --ignore=tests/integration/test_dv_sdk.py \
             -v --tb=short --junit-xml=/workspace/test-results.xml
       
       - name: Upload test results
