@@ -9,15 +9,11 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /workspace
 
-# Copy requirements
-COPY pyproject.toml ./
-COPY tests/integration/requirements.txt ./tests/integration/
+# Copy source code first (needed for editable install)
+COPY . .
 
-# Install package in editable mode
+# Install package in editable mode and test requirements
 RUN pip install --no-cache-dir -e .
 RUN pip install --no-cache-dir -r tests/integration/requirements.txt
-
-# Copy source code
-COPY . .
 
 CMD ["pytest", "tests/integration/", "-v"]
