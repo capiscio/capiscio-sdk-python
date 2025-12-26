@@ -1,0 +1,238 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'capiscio_sdk/**'
+      - 'tests/integration/**'
+      - '.github/workflows/integration-tests.yml'
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'capiscio_sdk/**'
+      - 'tests/integration/**'
+      - '.github/workflows/integration-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  integration-tests:
+    name: Integration Tests with Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: Checkout SDK repository
+        uses: actions/checkout@v4
+        with:
+          path: capiscio-sdk-python
+      
+      - name: Checkout server repository
+        uses: actions/checkout@v4
+        with:
+          repository: capiscio/capiscio-server
+          path: capiscio-server
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+      
+      - name: Checkout capiscio-core
+        uses: actions/checkout@v4
+        with:
+          repository: capiscio/capiscio-core
+          path: capiscio-core
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      
+      - name: Build capiscio binary
+        working-directory: capiscio-core
+        run: |
+          go build -o bin/capiscio ./cmd/capiscio
+          chmod +x bin/capiscio
+          echo "Built capiscio binary:"
+          ls -la bin/capiscio
+      
+      - name: Copy capiscio binary to SDK directory
+        run: |
+          cp capiscio-core/bin/capiscio capiscio-sdk-python/capiscio
+          chmod +x capiscio-sdk-python/capiscio
+          echo "Copied capiscio binary to SDK:"
+          ls -la capiscio-sdk-python/capiscio
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build capiscio-server Docker image
+        working-directory: capiscio-server
+        run: |
+          docker build -t capiscio-server:test -f Dockerfile .
+      
+      - name: Build SDK test runner image
+        working-directory: capiscio-sdk-python/tests/integration
+        run: |
+          docker build -t sdk-test-runner:latest -f Dockerfile.test ../..
+      
+      - name: Start test infrastructure
+        working-directory: capiscio-sdk-python/tests/integration
+        run: |
+          # Start postgres + server
+          docker compose up -d db server
+          
+          # Wait for server to be healthy
+          echo "Waiting for server to be healthy..."
+          timeout 60 bash -c 'until docker compose exec -T server wget --quiet --tries=1 --spider http://localhost:8080/health; do sleep 2; done' || {
+            echo "Server health check failed"
+            docker compose logs server
+            exit 1
+          }
+          
+          echo "✓ Server is healthy"
+      
+      - name: Run integration tests
+        working-directory: capiscio-sdk-python/tests/integration
+        env:
+          API_BASE_URL: http://server:8080
+        run: |
+          docker compose run --rm test-runner pytest tests/integration/ \
+            --ignore=tests/integration/test_dv_badge_flow.py \
+            --ignore=tests/integration/test_dv_order_api.py \
+            --ignore=tests/integration/test_dv_sdk.py \
+            -v --tb=short --junit-xml=/workspace/test-results.xml
+      
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-results
+          path: capiscio-sdk-python/test-results.xml
+          if-no-files-found: ignore
+      
+      - name: Show logs on failure
+        if: failure()
+        working-directory: capiscio-sdk-python/tests/integration
+        run: |
+          echo "=== Server logs ==="
+          docker compose logs server
+          echo "=== Database logs ==="
+          docker compose logs db
+          echo "=== Test runner logs ==="
+          docker compose logs test-runner
+      
+      - name: Cleanup
+        if: always()
+        working-directory: capiscio-sdk-python/tests/integration
+        run: |
+          docker compose down -v
+  
+  # Optional: Test with long-running tests (badge keeper auto-renewal)
+  long-integration-tests:
+    name: Long Integration Tests (Optional)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'run-long-tests')
+    
+    steps:
+      - name: Checkout SDK repository
+        uses: actions/checkout@v4
+        with:
+          path: capiscio-sdk-python
+      
+      - name: Checkout server repository
+        uses: actions/checkout@v4
+        with:
+          repository: capiscio/capiscio-server
+          path: capiscio-server
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+      
+      - name: Checkout capiscio-core
+        uses: actions/checkout@v4
+        with:
+          repository: capiscio/capiscio-core
+          path: capiscio-core
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      
+      - name: Build capiscio binary
+        working-directory: capiscio-core
+        run: |
+          go build -o bin/capiscio ./cmd/capiscio
+          chmod +x bin/capiscio
+      
+      - name: Copy capiscio binary to SDK directory
+        run: |
+          cp capiscio-core/bin/capiscio capiscio-sdk-python/capiscio
+          chmod +x capiscio-sdk-python/capiscio
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build capiscio-server Docker image
+        working-directory: capiscio-server
+        run: |
+          docker build -t capiscio-server:test -f Dockerfile .
+      
+      - name: Build SDK test runner image
+        working-directory: capiscio-sdk-python/tests/integration
+        run: |
+          docker build -t sdk-test-runner:latest -f Dockerfile.test ../..
+      
+      - name: Start test infrastructure
+        working-directory: capiscio-sdk-python/tests/integration
+        run: |
+          docker compose up -d db server
+          timeout 60 bash -c 'until docker compose exec -T server wget --quiet --tries=1 --spider http://localhost:8080/health; do sleep 2; done'
+      
+      - name: Run long integration tests
+        working-directory: capiscio-sdk-python/tests/integration
+        env:
+          RUN_LONG_TESTS: "1"
+          API_BASE_URL: http://server:8080
+        run: |
+          docker compose run --rm test-runner pytest tests/integration/ \
+            -v --tb=short -k "long"
+      
+      - name: Cleanup
+        if: always()
+        working-directory: capiscio-sdk-python/tests/integration
+        run: docker compose down -v
+  
+  summary:
+    name: Integration Tests Summary
+    needs: [integration-tests]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.integration-tests.result }}" != "success" ]; then
+            echo "❌ Integration tests failed"
+            exit 1
+          fi
+          echo "✅ Integration tests passed!"
+      
+      - name: Add PR comment
+        if: github.event_name == 'pull_request' && needs.integration-tests.result == 'success'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Integration tests passed! Server validation, BadgeKeeper, and gRPC tests all working.'
+            })

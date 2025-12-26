@@ -60,3 +60,6 @@ site/
 uv.lock
 agent-card.json
 capiscio_keys/
+
+# Capiscio binary (built during CI)
+capiscio
