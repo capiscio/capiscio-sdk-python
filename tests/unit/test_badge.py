@@ -254,7 +254,8 @@ class TestVerifyBadge:
     def test_verify_badge_success(self, mock_get_client):
         """Test successful badge verification."""
         mock_client = MagicMock()
-        mock_client.badge.verify_badge.return_value = (
+        # verify_badge now uses verify_badge_with_options for RFC-002 v1.3 staleness support
+        mock_client.badge.verify_badge_with_options.return_value = (
             True,
             {
                 "jti": "badge-123",
@@ -267,7 +268,8 @@ class TestVerifyBadge:
                 "agent_name": "Test Agent",
                 "aud": [],
             },
-            None,
+            [],  # warnings
+            None,  # error
         )
         mock_get_client.return_value = mock_client
 
@@ -282,9 +284,11 @@ class TestVerifyBadge:
     def test_verify_badge_invalid_signature(self, mock_get_client):
         """Test badge verification with invalid signature."""
         mock_client = MagicMock()
-        mock_client.badge.verify_badge.return_value = (
+        # verify_badge now uses verify_badge_with_options for RFC-002 v1.3 staleness support
+        mock_client.badge.verify_badge_with_options.return_value = (
             False,
             None,
+            [],  # warnings
             "BADGE_SIGNATURE_INVALID: signature verification failed",
         )
         mock_get_client.return_value = mock_client
@@ -299,7 +303,8 @@ class TestVerifyBadge:
     def test_verify_badge_untrusted_issuer(self, mock_get_client):
         """Test badge from untrusted issuer is rejected."""
         mock_client = MagicMock()
-        mock_client.badge.verify_badge.return_value = (
+        # verify_badge now uses verify_badge_with_options for RFC-002 v1.3 staleness support
+        mock_client.badge.verify_badge_with_options.return_value = (
             True,
             {
                 "jti": "badge-123",
@@ -312,7 +317,8 @@ class TestVerifyBadge:
                 "agent_name": "Evil Agent",
                 "aud": [],
             },
-            None,
+            [],  # warnings
+            None,  # error
         )
         mock_get_client.return_value = mock_client
 
@@ -329,7 +335,8 @@ class TestVerifyBadge:
     def test_verify_badge_audience_mismatch(self, mock_get_client):
         """Test badge with wrong audience is rejected."""
         mock_client = MagicMock()
-        mock_client.badge.verify_badge.return_value = (
+        # verify_badge now uses verify_badge_with_options for RFC-002 v1.3 staleness support
+        mock_client.badge.verify_badge_with_options.return_value = (
             True,
             {
                 "jti": "badge-123",
@@ -342,7 +349,8 @@ class TestVerifyBadge:
                 "agent_name": "Test Agent",
                 "aud": ["https://other-service.example.com"],
             },
-            None,
+            [],  # warnings
+            None,  # error
         )
         mock_get_client.return_value = mock_client
 
@@ -368,7 +376,8 @@ class TestVerifyBadge:
         """Test verify_badge accepts VerifyOptions object."""
         with patch("capiscio_sdk.badge._get_client") as mock_get_client:
             mock_client = MagicMock()
-            mock_client.badge.verify_badge.return_value = (
+            # verify_badge now uses verify_badge_with_options for RFC-002 v1.3 staleness support
+            mock_client.badge.verify_badge_with_options.return_value = (
                 True,
                 {
                     "jti": "badge-123",
@@ -381,7 +390,8 @@ class TestVerifyBadge:
                     "agent_name": "Test Agent",
                     "aud": [],
                 },
-                None,
+                [],  # warnings
+                None,  # error
             )
             mock_get_client.return_value = mock_client
 

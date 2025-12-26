@@ -288,10 +288,25 @@ def verify_badge(
     try:
         client = _get_client()
 
-        # Use the gRPC BadgeClient to verify
-        valid, claims_dict, error = client.badge.verify_badge(
+        # Map SDK mode to gRPC mode string
+        mode_map = {
+            VerifyMode.ONLINE: "online",
+            VerifyMode.OFFLINE: "offline",
+            VerifyMode.HYBRID: "hybrid",
+        }
+        grpc_mode = mode_map.get(options.mode, "online")
+
+        # Use verify_badge_with_options to pass all RFC-002 v1.3 staleness options
+        valid, claims_dict, warnings, error = client.badge.verify_badge_with_options(
             token=token,
-            public_key_jwk=options.public_key_jwk or "",
+            accept_self_signed=False,  # SDK handles this separately
+            trusted_issuers=options.trusted_issuers,
+            audience=options.audience or "",
+            skip_revocation=options.skip_revocation_check,
+            skip_agent_status=options.skip_agent_status_check,
+            mode=grpc_mode,
+            fail_open=options.fail_open,
+            stale_threshold_seconds=options.stale_threshold_seconds,
         )
 
         # Convert claims if available
@@ -301,9 +316,7 @@ def verify_badge(
 
         # Build result
         if valid:
-            # Additional client-side validation
-            warnings = []
-
+            # Additional client-side validation (server may not enforce all)
             # Check trusted issuers
             if options.trusted_issuers and claims:
                 if claims.issuer not in options.trusted_issuers:
@@ -329,7 +342,7 @@ def verify_badge(
             return VerifyResult(
                 valid=True,
                 claims=claims,
-                warnings=warnings,
+                warnings=warnings or [],
                 mode=options.mode,
             )
         else:
