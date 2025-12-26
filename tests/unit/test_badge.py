@@ -180,6 +180,9 @@ class TestVerifyOptions:
         assert options.audience is None
         assert options.skip_revocation_check is False
         assert options.skip_agent_status_check is False
+        # RFC-002 v1.3 §7.5: Staleness fail-closed defaults
+        assert options.fail_open is False
+        assert options.stale_threshold_seconds == 300
 
     def test_custom_values(self):
         """Test custom options."""
@@ -193,6 +196,24 @@ class TestVerifyOptions:
         assert options.trusted_issuers == ["https://registry.capisc.io"]
         assert options.audience == "https://my-service.example.com"
         assert options.skip_revocation_check is True
+
+    def test_staleness_options(self):
+        """Test RFC-002 v1.3 §7.5 staleness fail-closed options."""
+        # Test fail_open mode
+        options = VerifyOptions(fail_open=True)
+        assert options.fail_open is True
+
+        # Test custom stale threshold
+        options = VerifyOptions(stale_threshold_seconds=60)
+        assert options.stale_threshold_seconds == 60
+
+        # Test combined staleness options
+        options = VerifyOptions(
+            fail_open=True,
+            stale_threshold_seconds=120,
+        )
+        assert options.fail_open is True
+        assert options.stale_threshold_seconds == 120
 
 
 class TestVerifyResult:
