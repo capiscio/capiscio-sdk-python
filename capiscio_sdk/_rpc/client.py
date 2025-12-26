@@ -270,6 +270,8 @@ class BadgeClient:
         skip_revocation: bool = False,
         skip_agent_status: bool = False,
         mode: str = "online",
+        fail_open: bool = False,
+        stale_threshold_seconds: int = 300,
     ) -> tuple[bool, Optional[dict], list[str], Optional[str]]:
         """Verify a badge token with full options.
         
@@ -284,6 +286,8 @@ class BadgeClient:
             skip_revocation: Skip revocation check
             skip_agent_status: Skip agent status check
             mode: Verification mode ('online', 'offline', 'hybrid')
+            fail_open: RFC-002 v1.3 §7.5 - Allow verification when cache is stale (default: False)
+            stale_threshold_seconds: RFC-002 v1.3 §7.5 - Max cache staleness in seconds (default: 300)
             
         Returns:
             Tuple of (valid, claims, warnings, error_message)
@@ -313,6 +317,8 @@ class BadgeClient:
             skip_revocation=skip_revocation,
             skip_agent_status=skip_agent_status,
             accept_self_signed=accept_self_signed,
+            fail_open=fail_open,
+            stale_threshold_seconds=stale_threshold_seconds,
         )
         
         request = badge_pb2.VerifyBadgeWithOptionsRequest(
