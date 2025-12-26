@@ -171,6 +171,8 @@ class VerifyOptions:
         skip_revocation_check: Skip revocation check (testing only).
         skip_agent_status_check: Skip agent status check (testing only).
         public_key_jwk: Override public key (for offline verification).
+        fail_open: Allow stale cache for levels 2-4 (WARNING: violates RFC-002 default).
+        stale_threshold_seconds: Cache staleness threshold in seconds (default: 300 per RFC-002 §7.5).
     """
 
     mode: VerifyMode = VerifyMode.ONLINE
@@ -179,6 +181,12 @@ class VerifyOptions:
     skip_revocation_check: bool = False
     skip_agent_status_check: bool = False
     public_key_jwk: Optional[str] = None
+    fail_open: bool = False  # RFC-002 v1.3 §7.5: Default is fail-closed
+    stale_threshold_seconds: int = 300  # RFC-002 v1.3 §7.5: REVOCATION_CACHE_MAX_STALENESS
+
+
+# RFC-002 v1.3 §7.5 named constant
+REVOCATION_CACHE_MAX_STALENESS = 300  # 5 minutes
 
 
 @dataclass
@@ -224,6 +232,8 @@ def verify_badge(
     skip_revocation_check: bool = False,
     skip_agent_status_check: bool = False,
     public_key_jwk: Optional[str] = None,
+    fail_open: bool = False,
+    stale_threshold_seconds: int = REVOCATION_CACHE_MAX_STALENESS,
     options: Optional[VerifyOptions] = None,
 ) -> VerifyResult:
     """Verify a Trust Badge token.
@@ -233,6 +243,7 @@ def verify_badge(
     - Claims validation (exp, iat, iss, sub, aud)
     - Revocation check (online/hybrid modes)
     - Agent status check (online/hybrid modes)
+    - RFC-002 v1.3 §7.5: Staleness fail-closed for levels 2-4
 
     Args:
         token: The badge JWT/JWS token to verify.
@@ -242,6 +253,8 @@ def verify_badge(
         skip_revocation_check: Skip revocation check (testing only).
         skip_agent_status_check: Skip agent status check (testing only).
         public_key_jwk: Override public key JWK for offline verification.
+        fail_open: Allow stale cache for levels 2-4 (WARNING: violates RFC-002 default).
+        stale_threshold_seconds: Cache staleness threshold (default: 300 per RFC-002 §7.5).
         options: VerifyOptions object (alternative to individual args).
 
     Returns:
@@ -268,6 +281,8 @@ def verify_badge(
             skip_revocation_check=skip_revocation_check,
             skip_agent_status_check=skip_agent_status_check,
             public_key_jwk=public_key_jwk,
+            fail_open=fail_open,
+            stale_threshold_seconds=stale_threshold_seconds,
         )
 
     try:
@@ -322,7 +337,9 @@ def verify_badge(
             error_code = None
             if error:
                 # Extract error code from message if present
+                # RFC-002 v1.3: Added REVOCATION_CHECK_FAILED for staleness failures
                 for code in [
+                    "REVOCATION_CHECK_FAILED",  # RFC-002 v1.3 §7.5 staleness error
                     "BADGE_MALFORMED",
                     "BADGE_SIGNATURE_INVALID",
                     "BADGE_EXPIRED",
@@ -681,6 +698,8 @@ def start_badge_keeper(
 
 # Export public API
 __all__ = [
+    # Constants (RFC-002 v1.3 §7.5)
+    "REVOCATION_CACHE_MAX_STALENESS",
     # Types
     "BadgeClaims",
     "VerifyOptions",
