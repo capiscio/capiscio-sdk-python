@@ -42,6 +42,33 @@ jobs:
           path: capiscio-server
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
       
+      - name: Checkout capiscio-core
+        uses: actions/checkout@v4
+        with:
+          repository: capiscio/capiscio-core
+          path: capiscio-core
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      
+      - name: Build capiscio binary
+        working-directory: capiscio-core
+        run: |
+          go build -o bin/capiscio ./cmd/capiscio
+          chmod +x bin/capiscio
+          echo "Built capiscio binary:"
+          ls -la bin/capiscio
+      
+      - name: Copy capiscio binary to SDK directory
+        run: |
+          cp capiscio-core/bin/capiscio capiscio-sdk-python/capiscio
+          chmod +x capiscio-sdk-python/capiscio
+          echo "Copied capiscio binary to SDK:"
+          ls -la capiscio-sdk-python/capiscio
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       
@@ -86,8 +113,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: integration-test-results
-          path: test-results.xml
-          token: ${{ secrets.GITHUB_TOKEN }}
+          path: capiscio-sdk-python/test-results.xml
+          if-no-files-found: ignore
       
       - name: Show logs on failure
         if: failure()
@@ -125,6 +152,29 @@ jobs:
           repository: capiscio/capiscio-server
           path: capiscio-server
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
+      
+      - name: Checkout capiscio-core
+        uses: actions/checkout@v4
+        with:
+          repository: capiscio/capiscio-core
+          path: capiscio-core
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+      
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      
+      - name: Build capiscio binary
+        working-directory: capiscio-core
+        run: |
+          go build -o bin/capiscio ./cmd/capiscio
+          chmod +x bin/capiscio
+      
+      - name: Copy capiscio binary to SDK directory
+        run: |
+          cp capiscio-core/bin/capiscio capiscio-sdk-python/capiscio
+          chmod +x capiscio-sdk-python/capiscio
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
