@@ -1,5 +1,29 @@
 # capiscio-sdk-python - GitHub Copilot Instructions
 
+## 🛑 ABSOLUTE RULES - NO EXCEPTIONS
+
+These rules are non-negotiable. Violating them will cause production issues.
+
+### 1. ALL WORK VIA PULL REQUESTS
+- **NEVER commit directly to `main`.** All changes MUST go through PRs.
+- Create feature branches: `feature/`, `fix/`, `chore/`
+- PRs require CI to pass before merge consideration
+
+### 2. LOCAL CI VALIDATION BEFORE PUSH
+- **ALL tests MUST pass locally before pushing to a PR.**
+- Run: `pytest -v`
+- If tests fail locally, fix them before pushing. Never push failing code.
+
+### 3. RFCs ARE READ-ONLY
+- **DO NOT modify RFCs without explicit team authorization.**
+- Implementation must conform to RFCs in `capiscio-rfcs/`
+
+### 4. NO WATCH/BLOCKING COMMANDS
+- **NEVER run blocking commands** without timeout
+- Use `timeout` wrapper for long-running commands
+
+---
+
 ## Repository Purpose
 
 **capiscio-sdk-python** is the official Python SDK for CapiscIO, providing:
