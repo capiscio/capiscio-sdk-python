@@ -296,18 +296,27 @@ def verify_badge(
         }
         grpc_mode = mode_map.get(options.mode, "online")
 
-        # Use verify_badge_with_options to pass all RFC-002 v1.3 staleness options
-        valid, claims_dict, warnings, error = client.badge.verify_badge_with_options(
-            token=token,
-            accept_self_signed=False,  # SDK handles this separately
-            trusted_issuers=options.trusted_issuers,
-            audience=options.audience or "",
-            skip_revocation=options.skip_revocation_check,
-            skip_agent_status=options.skip_agent_status_check,
-            mode=grpc_mode,
-            fail_open=options.fail_open,
-            stale_threshold_seconds=options.stale_threshold_seconds,
-        )
+        # If public_key_jwk is provided, use the simpler verify_badge RPC
+        # which supports offline verification with a specific key
+        if options.public_key_jwk:
+            valid, claims_dict, error = client.badge.verify_badge(
+                token=token,
+                public_key_jwk=options.public_key_jwk,
+            )
+            warnings = []
+        else:
+            # Use verify_badge_with_options for online/hybrid verification
+            valid, claims_dict, warnings, error = client.badge.verify_badge_with_options(
+                token=token,
+                accept_self_signed=False,  # SDK handles this separately
+                trusted_issuers=options.trusted_issuers,
+                audience=options.audience or "",
+                skip_revocation=options.skip_revocation_check,
+                skip_agent_status=options.skip_agent_status_check,
+                mode=grpc_mode,
+                fail_open=options.fail_open,
+                stale_threshold_seconds=options.stale_threshold_seconds,
+            )
 
         # Convert claims if available
         claims = None

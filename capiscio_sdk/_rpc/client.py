@@ -1298,8 +1298,9 @@ def _claims_to_dict(claims) -> dict:
         return {}
     
     # Map proto enum to human-readable trust level string
+    # Note: UNSPECIFIED (0) defaults to "1" (DV) for compatibility
     trust_level_map = {
-        0: "unspecified",  # TRUST_LEVEL_UNSPECIFIED
+        0: "1",  # TRUST_LEVEL_UNSPECIFIED -> default to DV (1)
         1: "0",  # TRUST_LEVEL_SELF_SIGNED (Level 0)
         2: "1",  # TRUST_LEVEL_DV (Level 1)
         3: "2",  # TRUST_LEVEL_OV (Level 2)
