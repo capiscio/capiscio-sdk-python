@@ -1,0 +1,23 @@
+# Dockerfile.test - Test container for capiscio-sdk-python
+# Used by E2E tests to execute SDK operations
+
+FROM python:3.11-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+# Copy the entire SDK
+COPY . .
+
+# Install pip and dependencies first, then SDK
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir hatchling && \
+    pip install --no-cache-dir -e .
+
+# Keep container running for test execution
+CMD ["sleep", "infinity"]
