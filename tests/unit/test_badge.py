@@ -403,6 +403,43 @@ class TestVerifyBadge:
 
             assert result.valid
 
+    @patch("capiscio_sdk.badge._get_client")
+    def test_verify_badge_with_public_key_jwk(self, mock_get_client):
+        """Test verify_badge uses simpler verify_badge RPC when public_key_jwk is provided."""
+        mock_client = MagicMock()
+        # When public_key_jwk is provided, verify_badge (not verify_badge_with_options) is called
+        mock_client.badge.verify_badge.return_value = (
+            True,
+            {
+                "jti": "badge-123",
+                "iss": "https://registry.capisc.io",
+                "sub": "did:web:registry.capisc.io:agents:test",
+                "iat": int(utc_now().timestamp()),
+                "exp": int((utc_now() + timedelta(days=365)).timestamp()),
+                "trust_level": "1",
+                "domain": "example.com",
+                "agent_name": "Test Agent",
+                "aud": [],
+            },
+            None,  # error
+        )
+        mock_get_client.return_value = mock_client
+
+        # Provide a public_key_jwk to trigger the alternate code path
+        result = verify_badge(
+            "test.token.here",
+            public_key_jwk='{"kty": "OKP", "crv": "Ed25519", "x": "test"}',
+        )
+
+        assert result.valid
+        assert result.claims is not None
+        assert result.claims.jti == "badge-123"
+        # Verify that warnings is empty (initialized as []) when using verify_badge
+        assert result.warnings == []
+        # Verify that verify_badge was called instead of verify_badge_with_options
+        mock_client.badge.verify_badge.assert_called_once()
+        mock_client.badge.verify_badge_with_options.assert_not_called()
+
 
 class TestParseBadge:
     """Tests for parse_badge function."""
