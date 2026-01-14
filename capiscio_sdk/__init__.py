@@ -14,7 +14,7 @@ Example:
     >>> result = validate_agent_card(card_dict)  # Uses Go core
 """
 
-__version__ = "0.3.1"
+__version__ = "2.3.1"
 
 # Core exports
 from .executor import CapiscioSecurityExecutor, secure, secure_agent

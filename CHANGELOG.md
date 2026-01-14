@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [2.3.1] - 2025-01-14
+
+### Fixed
+- Fixed `__version__` in package `__init__.py` (was 0.3.1, now 2.3.1)
+- Aligned all version references across package metadata
+
 ## [0.1.0] - 2025-01-10
 
 ### Added
@@ -92,25 +100,133 @@ pip install capiscio-sdk==0.1.0
 
 ## [2.3.0] - 2025-01-14
 
-### Changed
-- **Version Alignment**: Aligned SDK version with other CapiscIO products (capiscio-server, capiscio-ui, capiscio-core) for unified release management.
+**Major Release** - Complete Trust Badge ecosystem with gRPC backend, PoP protocol, and DV badge flow.
+
+This release introduces the **capiscio-core gRPC integration**, enabling high-performance badge operations through a native Go backend. The SDK now provides a complete implementation of RFC-002 (Trust Badges) and RFC-003 (Proof of Possession).
 
 ### Added
-- **RFC-003 PoP Support**: Full Proof of Possession (PoP) protocol implementation for enhanced security.
-- **DV Badge SDK**: Domain Validation badge support with SDK integration.
-- **RFC-002 v1.3 §7.5 Staleness Options**: Badge staleness configuration per specification.
-- **Trust Badge gRPC Client**: gRPC-based badge validation client for high-performance scenarios.
-- **Comprehensive gRPC SDK Integration Guide**: Documentation for gRPC-based integrations.
+
+#### Trust Badge API (`capiscio_sdk.badge`)
+- **`verify_badge()`** - Full badge verification with signature, expiration, and revocation checks
+- **`parse_badge()`** - Parse badge claims without verification (for inspection)
+- **`request_badge()` / `request_badge_sync()`** - Request new badges from CA
+- **`request_pop_badge()` / `request_pop_badge_sync()`** - RFC-003 Proof of Possession badge requests
+- **`start_badge_keeper()`** - Start automatic badge renewal
+- **`BadgeClaims`** dataclass with full RFC-002 claim support
+- **`VerifyOptions`** - Configurable verification (audience, issuers, clock skew)
+- **`VerifyMode`** enum - `ONLINE`, `OFFLINE`, `HYBRID` verification modes
+- **`TrustLevel`** enum - Level 1 (DV), Level 2 (OV), Level 3 (EV)
+
+#### Badge Lifecycle Management (`capiscio_sdk.badge_keeper`)
+- **`BadgeKeeper`** class - Automatic badge renewal with background thread
+  - Configurable renewal threshold (renew N seconds before expiry)
+  - Exponential backoff retry on failure
+  - Callback support for badge updates (`on_renew`)
+  - Integration with `SimpleGuard` for seamless auth
+- **`BadgeKeeperConfig`** - Full configuration options (TTL, trust level, output file)
+
+#### Domain Validation API (`capiscio_sdk.dv`)
+- **`create_dv_order()`** - Create DV badge order with HTTP-01 or DNS-01 challenge
+- **`get_dv_order()`** - Check order status
+- **`finalize_dv_order()`** - Complete validation and receive grant JWT
+- **`DVOrder`** dataclass - Order details (challenge token, validation URL, DNS record)
+- **`DVGrant`** dataclass - Signed grant JWT for badge issuance
+
+#### gRPC Backend (`capiscio_sdk._rpc`)
+- **`CapiscioRPCClient`** - High-level gRPC client for capiscio-core
+  - Auto-starts local capiscio-core binary when needed
+  - Connection pooling and health checks
+  - Context manager support (`with CapiscioRPCClient() as client:`)
+- **Generated Protocol Buffers** for all services:
+  - `BadgeService` - Badge parsing, verification, issuance
+  - `DIDService` - DID parsing and resolution
+  - `TrustService` - Trust level operations
+  - `RevocationService` - Badge revocation checks
+  - `ScoringService` - Trust scoring calculations
+  - `SimpleGuardService` - Request signing and verification
+  - `RegistryService` - Agent registry operations
+- **`ProcessManager`** - Manages capiscio-core subprocess lifecycle
+
+#### Core Validator (`capiscio_sdk.validators`)
+- **`CoreValidator`** class - Go-backed validation for agent cards
+- **`validate_agent_card()`** - One-liner validation using Go core
+- RFC-004 Agent Card schema validation
+- Much faster than pure-Python validation
+
+#### RFC-002 v1.3 §7.5 Staleness Options
+- Configurable badge staleness thresholds
+- `max_age` parameter for verification
+- Grace period support for expiring badges
+
+### Changed
+- **Version Alignment**: SDK version now matches other CapiscIO products (capiscio-server, capiscio-ui, capiscio-core v2.3.0)
+- **SimpleGuard Refactoring**: 
+  - Now uses gRPC backend for cryptographic operations
+  - Improved request signing with `sign_request()` / `verify_request()`
+  - Better error messages with RFC references
+- **Scoring Module**: Enhanced with gRPC-backed calculations
 
 ### Fixed
-- **CI/CD Improvements**: 
-  - Publish workflow now runs only unit tests to prevent false failures from missing infrastructure.
-  - Enhanced SDK integration tests with CI automation.
-- **Lint Issues**: Fixed linting issues and updated ruff configuration.
+- **CI/CD Pipeline**: 
+  - Publish workflow now runs only unit tests (prevents false failures from missing infrastructure)
+  - Integration tests moved to dedicated workflow with Docker infrastructure
+- **Lint Issues**: Fixed all ruff warnings, updated to latest ruff config
+- **FastAPI Integration**: Improved middleware error handling
+
+### Infrastructure
+- **New Integration Test Suite** with Docker Compose:
+  - `test_badge_keeper.py` - Badge lifecycle tests
+  - `test_dv_badge_flow.py` - Full DV flow E2E tests
+  - `test_dv_order_api.py` - DV API tests
+  - `test_dv_sdk.py` - SDK integration tests
+  - `test_grpc_scoring.py` - gRPC scoring tests
+  - `test_server_integration.py` - Server integration tests
+  - `test_simple_guard.py` - SimpleGuard tests
+- **New Unit Tests**:
+  - `test_badge.py` - Badge API unit tests
+  - `test_badge_keeper.py` - BadgeKeeper unit tests
+  - `test_core_validator.py` - CoreValidator tests
+  - `test_pop_badge.py` - PoP protocol tests
+- **GitHub Actions Workflows**:
+  - `integration-tests.yml` - Full integration tests with capiscio-server + postgres + capiscio-core
 
 ### Documentation
-- Added GitHub Copilot instructions for AI-assisted development.
-- Updated workspace guidelines for multi-repo development.
+- **Comprehensive gRPC Integration Guide** (`docs/guides/badge-verification.md`)
+- **Badge Verification Guide** with code examples
+- **GitHub Copilot Instructions** for AI-assisted development
+- **API Reference** updates for all new modules
+
+### Dependencies
+- Added `grpcio` and `grpcio-tools` for gRPC support
+- Added `protobuf` for Protocol Buffer serialization
+- Updated `cryptography` to latest version
+
+### Statistics
+- **+12,568 lines of code** added
+- **63 files** changed
+- **7 new modules** added
+- **1,321 line** gRPC client implementation
+- **737 line** badge API implementation
+- **304 line** BadgeKeeper implementation
+- **296 line** DV API implementation
+
+### Migration from v0.3.x
+This release is backwards compatible. Existing `SimpleGuard` and `CapiscioSecurityExecutor` usage continues to work. New features are additive.
+
+To use new badge features:
+```python
+from capiscio_sdk import verify_badge, BadgeKeeper, create_dv_order
+
+# Verify an incoming badge
+result = verify_badge(token, trusted_issuers=["https://registry.capisc.io"])
+
+# Auto-renew badges
+keeper = BadgeKeeper(api_url="...", api_key="...", agent_id="...")
+keeper.start()
+
+# Get a DV badge
+order = create_dv_order(domain="example.com", challenge_type="http-01", jwk=jwk)
+```
 
 ## [0.3.1] - 2025-11-23
 
