@@ -90,6 +90,28 @@ pip install capiscio-sdk==0.1.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2025-01-14
+
+### Changed
+- **Version Alignment**: Aligned SDK version with other CapiscIO products (capiscio-server, capiscio-ui, capiscio-core) for unified release management.
+
+### Added
+- **RFC-003 PoP Support**: Full Proof of Possession (PoP) protocol implementation for enhanced security.
+- **DV Badge SDK**: Domain Validation badge support with SDK integration.
+- **RFC-002 v1.3 §7.5 Staleness Options**: Badge staleness configuration per specification.
+- **Trust Badge gRPC Client**: gRPC-based badge validation client for high-performance scenarios.
+- **Comprehensive gRPC SDK Integration Guide**: Documentation for gRPC-based integrations.
+
+### Fixed
+- **CI/CD Improvements**: 
+  - Publish workflow now runs only unit tests to prevent false failures from missing infrastructure.
+  - Enhanced SDK integration tests with CI automation.
+- **Lint Issues**: Fixed linting issues and updated ruff configuration.
+
+### Documentation
+- Added GitHub Copilot instructions for AI-assisted development.
+- Updated workspace guidelines for multi-repo development.
+
 ## [0.3.1] - 2025-11-23
 
 ### Fixed
@@ -127,5 +149,8 @@ pip install capiscio-sdk==0.1.0
 
 ---
 
+[2.3.0]: https://github.com/capiscio/capiscio-sdk-python/releases/tag/v2.3.0
+[0.3.1]: https://github.com/capiscio/capiscio-sdk-python/releases/tag/v0.3.1
+[0.3.0]: https://github.com/capiscio/capiscio-sdk-python/releases/tag/v0.3.0
 [0.1.0]: https://github.com/capiscio/capiscio-sdk-python/releases/tag/v0.1.0
 
