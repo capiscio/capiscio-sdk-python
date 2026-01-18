@@ -1,7 +1,8 @@
 """Message validation logic."""
 from typing import TYPE_CHECKING, Any, Dict, List
 from ..types import ValidationResult, ValidationIssue, ValidationSeverity
-from ..scoring import TrustScorer, AvailabilityScorer
+# Import legacy scorer directly to avoid deprecation warning (we only use score_not_tested)
+from ..scoring.availability import AvailabilityScorer as _LegacyAvailabilityScorer
 
 if TYPE_CHECKING:
     from ..scoring.types import ComplianceScore
@@ -19,8 +20,8 @@ class MessageValidator:
     def __init__(self) -> None:
         """Initialize message validator."""
         self._url_validator = URLSecurityValidator()
-        self._trust_scorer = TrustScorer()
-        self._availability_scorer = AvailabilityScorer()
+        # Use legacy scorer directly (not the deprecated wrapper) for score_not_tested()
+        self._availability_scorer = _LegacyAvailabilityScorer()
 
     def validate(self, message: Dict[str, Any], skip_signature_verification: bool = True) -> ValidationResult:
         """
