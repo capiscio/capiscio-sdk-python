@@ -107,6 +107,7 @@ jobs:
             --ignore=tests/integration/test_dv_badge_flow.py \
             --ignore=tests/integration/test_dv_order_api.py \
             --ignore=tests/integration/test_dv_sdk.py \
+            --ignore=tests/integration/test_mcp_service.py \
             -v --tb=short --junit-xml=/workspace/test-results.xml
       
       - name: Upload test results

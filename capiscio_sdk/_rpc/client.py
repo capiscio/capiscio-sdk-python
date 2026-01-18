@@ -1,6 +1,6 @@
 """gRPC client wrapper for capiscio-core."""
 
-from typing import Optional
+from typing import Generator, Optional
 
 import grpc
 
@@ -9,6 +9,7 @@ from capiscio_sdk._rpc.process import ProcessManager, get_process_manager
 # Import generated stubs
 from capiscio_sdk._rpc.gen.capiscio.v1 import badge_pb2, badge_pb2_grpc
 from capiscio_sdk._rpc.gen.capiscio.v1 import did_pb2, did_pb2_grpc
+from capiscio_sdk._rpc.gen.capiscio.v1 import mcp_pb2, mcp_pb2_grpc
 from capiscio_sdk._rpc.gen.capiscio.v1 import trust_pb2, trust_pb2_grpc
 from capiscio_sdk._rpc.gen.capiscio.v1 import revocation_pb2, revocation_pb2_grpc
 from capiscio_sdk._rpc.gen.capiscio.v1 import scoring_pb2, scoring_pb2_grpc
@@ -59,6 +60,7 @@ class CapiscioRPCClient:
         # Service stubs (initialized on connect)
         self._badge_stub: Optional[badge_pb2_grpc.BadgeServiceStub] = None
         self._did_stub: Optional[did_pb2_grpc.DIDServiceStub] = None
+        self._mcp_stub: Optional[mcp_pb2_grpc.MCPServiceStub] = None
         self._trust_stub: Optional[trust_pb2_grpc.TrustStoreServiceStub] = None
         self._revocation_stub: Optional[revocation_pb2_grpc.RevocationServiceStub] = None
         self._scoring_stub: Optional[scoring_pb2_grpc.ScoringServiceStub] = None
@@ -68,6 +70,7 @@ class CapiscioRPCClient:
         # Service wrappers
         self._badge: Optional["BadgeClient"] = None
         self._did: Optional["DIDClient"] = None
+        self._mcp: Optional["MCPClient"] = None
         self._trust: Optional["TrustStoreClient"] = None
         self._revocation: Optional["RevocationClient"] = None
         self._scoring: Optional["ScoringClient"] = None
@@ -103,6 +106,7 @@ class CapiscioRPCClient:
         # Initialize stubs
         self._badge_stub = badge_pb2_grpc.BadgeServiceStub(self._channel)
         self._did_stub = did_pb2_grpc.DIDServiceStub(self._channel)
+        self._mcp_stub = mcp_pb2_grpc.MCPServiceStub(self._channel)
         self._trust_stub = trust_pb2_grpc.TrustStoreServiceStub(self._channel)
         self._revocation_stub = revocation_pb2_grpc.RevocationServiceStub(self._channel)
         self._scoring_stub = scoring_pb2_grpc.ScoringServiceStub(self._channel)
@@ -112,6 +116,7 @@ class CapiscioRPCClient:
         # Initialize service wrappers
         self._badge = BadgeClient(self._badge_stub)
         self._did = DIDClient(self._did_stub)
+        self._mcp = MCPClient(self._mcp_stub)
         self._trust = TrustStoreClient(self._trust_stub)
         self._revocation = RevocationClient(self._revocation_stub)
         self._scoring = ScoringClient(self._scoring_stub)
@@ -129,6 +134,7 @@ class CapiscioRPCClient:
         # Clear stubs
         self._badge_stub = None
         self._did_stub = None
+        self._mcp_stub = None
         self._trust_stub = None
         self._revocation_stub = None
         self._scoring_stub = None
@@ -158,6 +164,13 @@ class CapiscioRPCClient:
         self._ensure_connected()
         assert self._did is not None
         return self._did
+    
+    @property
+    def mcp(self) -> "MCPClient":
+        """Access the MCPService (RFC-006 / RFC-007)."""
+        self._ensure_connected()
+        assert self._mcp is not None
+        return self._mcp
     
     @property
     def trust(self) -> "TrustStoreClient":
@@ -501,7 +514,7 @@ class BadgeClient:
         renew_before_seconds: int = 60,
         check_interval_seconds: int = 30,
         trust_level: int = 1,
-    ):
+    ) -> Generator[dict, None, None]:
         """Start a badge keeper daemon (RFC-002 §7.3).
         
         The keeper automatically renews badges before they expire, ensuring
@@ -521,8 +534,8 @@ class BadgeClient:
             trust_level: Trust level for CA mode (1-4, default: 1)
             
         Yields:
-            KeeperEvent dicts with: type, badge_jti, subject, trust_level,
-            expires_at, error, error_code, timestamp, token
+            dict: KeeperEvent dicts with keys: type, badge_jti, subject, trust_level,
+                expires_at, error, error_code, timestamp, token
             
         Example:
             # CA mode
@@ -1262,6 +1275,395 @@ class SimpleGuardClient:
             "has_private_key": response.has_private_key,
             "public_key_pem": response.public_key_pem,
         }, None
+
+
+class MCPClient:
+    """Client wrapper for MCPService (RFC-006 Tool Authority + RFC-007 Server Identity).
+    
+    This client provides access to MCP security operations including:
+    - Tool access evaluation (RFC-006 §6.2-6.4)
+    - Server identity verification (RFC-007 §7.2)
+    - Server identity parsing from HTTP/JSON-RPC transports
+    
+    Example:
+        from capiscio_sdk._rpc.client import CapiscioRPCClient
+        
+        client = CapiscioRPCClient()
+        client.connect()
+        
+        # Evaluate tool access with a badge
+        result = client.mcp.evaluate_tool_access(
+            tool_name="write_file",
+            params_hash="abc123",
+            server_origin="https://files.example.com",
+            badge_jws=badge_token,
+        )
+        
+        if result["decision"] == "allow":
+            print(f"Tool access granted for {result['agent_did']}")
+        else:
+            print(f"Access denied: {result['deny_reason']}")
+            
+        # Verify server identity
+        server_result = client.mcp.verify_server_identity(
+            server_did="did:web:example.com:mcp:files",
+            server_badge=server_badge,
+            transport_origin="https://files.example.com",
+        )
+    """
+    
+    def __init__(self, stub: mcp_pb2_grpc.MCPServiceStub) -> None:
+        self._stub = stub
+    
+    def evaluate_tool_access(
+        self,
+        tool_name: str,
+        params_hash: str = "",
+        server_origin: str = "",
+        *,
+        badge_jws: Optional[str] = None,
+        api_key: Optional[str] = None,
+        policy_version: str = "",
+        trusted_issuers: Optional[list[str]] = None,
+        min_trust_level: int = 0,
+        accept_level_zero: bool = False,
+        allowed_tools: Optional[list[str]] = None,
+    ) -> dict:
+        """Evaluate tool access request (RFC-006 §6.2-6.4).
+        
+        Evaluates whether a caller (identified by badge or API key) is
+        authorized to invoke a specific tool. Returns both a decision
+        and evidence record atomically.
+        
+        Args:
+            tool_name: Name of the tool being invoked
+            params_hash: Hash of the tool parameters (for audit)
+            server_origin: Origin of the MCP server handling the request
+            badge_jws: Caller's badge JWT (for badged access)
+            api_key: Caller's API key (for API key access)
+            policy_version: Optional policy version to use
+            trusted_issuers: List of trusted badge issuers
+            min_trust_level: Minimum required trust level (0-4)
+            accept_level_zero: Accept self-signed (level 0) badges
+            allowed_tools: Explicit list of allowed tools (if set, tool_name must match)
+            
+        Returns:
+            Dict with:
+                decision: "allow" or "deny"
+                deny_reason: Reason if denied (e.g., "badge_missing", "trust_insufficient")
+                deny_detail: Detailed error message if denied
+                agent_did: DID of the authenticated agent (if authenticated)
+                badge_jti: Badge JTI (if badge was used)
+                auth_level: Authentication level ("anonymous", "api_key", "badge")
+                trust_level: Agent's trust level (0-4)
+                evidence_json: RFC-006 §7 evidence record as JSON
+                evidence_id: Unique evidence record ID
+                timestamp: Evaluation timestamp (ISO format)
+                
+        Example:
+            # Evaluate with badge
+            result = client.mcp.evaluate_tool_access(
+                tool_name="write_file",
+                params_hash=hashlib.sha256(json.dumps(params).encode()).hexdigest(),
+                server_origin="https://files.example.com",
+                badge_jws=badge_token,
+                min_trust_level=2,  # Require OV or higher
+            )
+            
+            if result["decision"] == "allow":
+                # Proceed with tool execution
+                pass
+            else:
+                raise PermissionError(result["deny_detail"])
+        """
+        # Build config
+        config = mcp_pb2.EvaluateConfig(
+            trusted_issuers=trusted_issuers or [],
+            min_trust_level=min_trust_level,
+            accept_level_zero=accept_level_zero,
+            allowed_tools=allowed_tools or [],
+        )
+        
+        # Build request with caller credential
+        request = mcp_pb2.EvaluateToolAccessRequest(
+            tool_name=tool_name,
+            params_hash=params_hash,
+            server_origin=server_origin,
+            policy_version=policy_version,
+            config=config,
+        )
+        
+        # Set credential (badge or api_key, mutually exclusive)
+        if badge_jws:
+            request.badge_jws = badge_jws
+        elif api_key:
+            request.api_key = api_key
+        
+        response = self._stub.EvaluateToolAccess(request)
+        
+        # Map enums to strings
+        decision_map = {
+            mcp_pb2.MCP_DECISION_UNSPECIFIED: "unspecified",
+            mcp_pb2.MCP_DECISION_ALLOW: "allow",
+            mcp_pb2.MCP_DECISION_DENY: "deny",
+        }
+        
+        deny_reason_map = {
+            mcp_pb2.MCP_DENY_REASON_UNSPECIFIED: "",
+            mcp_pb2.MCP_DENY_REASON_BADGE_MISSING: "badge_missing",
+            mcp_pb2.MCP_DENY_REASON_BADGE_INVALID: "badge_invalid",
+            mcp_pb2.MCP_DENY_REASON_BADGE_EXPIRED: "badge_expired",
+            mcp_pb2.MCP_DENY_REASON_BADGE_REVOKED: "badge_revoked",
+            mcp_pb2.MCP_DENY_REASON_TRUST_INSUFFICIENT: "trust_insufficient",
+            mcp_pb2.MCP_DENY_REASON_TOOL_NOT_ALLOWED: "tool_not_allowed",
+            mcp_pb2.MCP_DENY_REASON_ISSUER_UNTRUSTED: "issuer_untrusted",
+            mcp_pb2.MCP_DENY_REASON_POLICY_DENIED: "policy_denied",
+        }
+        
+        auth_level_map = {
+            mcp_pb2.MCP_AUTH_LEVEL_UNSPECIFIED: "unspecified",
+            mcp_pb2.MCP_AUTH_LEVEL_ANONYMOUS: "anonymous",
+            mcp_pb2.MCP_AUTH_LEVEL_API_KEY: "api_key",
+            mcp_pb2.MCP_AUTH_LEVEL_BADGE: "badge",
+        }
+        
+        # Format timestamp
+        timestamp_str = ""
+        if response.timestamp:
+            from datetime import datetime, timezone
+            timestamp_str = datetime.fromtimestamp(
+                response.timestamp.seconds + response.timestamp.nanos / 1e9,
+                timezone.utc
+            ).isoformat()
+        
+        return {
+            "decision": decision_map.get(response.decision, "unspecified"),
+            "deny_reason": deny_reason_map.get(response.deny_reason, ""),
+            "deny_detail": response.deny_detail,
+            "agent_did": response.agent_did,
+            "badge_jti": response.badge_jti,
+            "auth_level": auth_level_map.get(response.auth_level, "unspecified"),
+            "trust_level": response.trust_level,
+            "evidence_json": response.evidence_json,
+            "evidence_id": response.evidence_id,
+            "timestamp": timestamp_str,
+        }
+    
+    def verify_server_identity(
+        self,
+        server_did: str,
+        server_badge: str = "",
+        transport_origin: str = "",
+        endpoint_path: str = "",
+        *,
+        trusted_issuers: Optional[list[str]] = None,
+        min_trust_level: int = 0,
+        accept_level_zero: bool = False,
+        offline_mode: bool = False,
+        skip_origin_binding: bool = False,
+    ) -> dict:
+        """Verify MCP server identity (RFC-007 §7.2).
+        
+        Verifies a server's disclosed identity (DID + badge) and checks
+        that it matches the transport origin. Returns the verification
+        state and any errors.
+        
+        Args:
+            server_did: Server's DID (did:web:... or did:key:...)
+            server_badge: Server's badge JWT (optional for level 0)
+            transport_origin: Origin from the transport (e.g., "https://files.example.com")
+            endpoint_path: Endpoint path being accessed
+            trusted_issuers: List of trusted badge issuers
+            min_trust_level: Minimum required trust level (0-4)
+            accept_level_zero: Accept self-signed (level 0) servers
+            offline_mode: Skip online validation (use cache only)
+            skip_origin_binding: Skip transport origin binding check (RFC-007 §5.3)
+            
+        Returns:
+            Dict with:
+                state: Server state ("verified_principal", "declared_principal", "unverified_origin")
+                trust_level: Server's trust level (0-4)
+                server_did: Verified server DID
+                badge_jti: Server badge JTI (if badge was provided)
+                error_code: Error code if verification failed
+                error_detail: Detailed error message
+                
+        Example:
+            # Verify server before trusting tool results
+            result = client.mcp.verify_server_identity(
+                server_did="did:web:files.example.com:mcp:files",
+                server_badge=server_badge_token,
+                transport_origin="https://files.example.com",
+                min_trust_level=1,  # Require at least DV
+            )
+            
+            if result["state"] == "verified_principal":
+                print(f"Server verified at trust level {result['trust_level']}")
+            else:
+                print(f"Server verification failed: {result['error_detail']}")
+        """
+        # Build config
+        config = mcp_pb2.MCPVerifyConfig(
+            trusted_issuers=trusted_issuers or [],
+            min_trust_level=min_trust_level,
+            accept_level_zero=accept_level_zero,
+            offline_mode=offline_mode,
+            skip_origin_binding=skip_origin_binding,
+        )
+        
+        request = mcp_pb2.VerifyServerIdentityRequest(
+            server_did=server_did,
+            server_badge=server_badge,
+            transport_origin=transport_origin,
+            endpoint_path=endpoint_path,
+            config=config,
+        )
+        
+        response = self._stub.VerifyServerIdentity(request)
+        
+        # Map enums to strings
+        state_map = {
+            mcp_pb2.MCP_SERVER_STATE_UNSPECIFIED: "unspecified",
+            mcp_pb2.MCP_SERVER_STATE_VERIFIED_PRINCIPAL: "verified_principal",
+            mcp_pb2.MCP_SERVER_STATE_DECLARED_PRINCIPAL: "declared_principal",
+            mcp_pb2.MCP_SERVER_STATE_UNVERIFIED_ORIGIN: "unverified_origin",
+        }
+        
+        error_code_map = {
+            mcp_pb2.MCP_SERVER_ERROR_NONE: "",
+            mcp_pb2.MCP_SERVER_ERROR_DID_INVALID: "did_invalid",
+            mcp_pb2.MCP_SERVER_ERROR_BADGE_INVALID: "badge_invalid",
+            mcp_pb2.MCP_SERVER_ERROR_BADGE_EXPIRED: "badge_expired",
+            mcp_pb2.MCP_SERVER_ERROR_BADGE_REVOKED: "badge_revoked",
+            mcp_pb2.MCP_SERVER_ERROR_TRUST_INSUFFICIENT: "trust_insufficient",
+            mcp_pb2.MCP_SERVER_ERROR_ORIGIN_MISMATCH: "origin_mismatch",
+            mcp_pb2.MCP_SERVER_ERROR_PATH_MISMATCH: "path_mismatch",
+            mcp_pb2.MCP_SERVER_ERROR_ISSUER_UNTRUSTED: "issuer_untrusted",
+        }
+        
+        return {
+            "state": state_map.get(response.state, "unspecified"),
+            "trust_level": response.trust_level,
+            "server_did": response.server_did,
+            "badge_jti": response.badge_jti,
+            "error_code": error_code_map.get(response.error_code, ""),
+            "error_detail": response.error_detail,
+        }
+    
+    def parse_server_identity_http(
+        self,
+        capiscio_server_did: str = "",
+        capiscio_server_badge: str = "",
+    ) -> dict:
+        """Parse server identity from HTTP headers (RFC-007 §5.2).
+        
+        Extracts server identity from HTTP headers. Use this before
+        verify_server_identity() to extract the DID and badge.
+        
+        Args:
+            capiscio_server_did: Value of Capiscio-Server-DID header
+            capiscio_server_badge: Value of Capiscio-Server-Badge header
+            
+        Returns:
+            Dict with:
+                server_did: Extracted server DID
+                server_badge: Extracted server badge JWT
+                identity_present: Whether identity was present
+                
+        Example:
+            # Extract from HTTP headers
+            headers = response.headers
+            identity = client.mcp.parse_server_identity_http(
+                capiscio_server_did=headers.get("Capiscio-Server-DID", ""),
+                capiscio_server_badge=headers.get("Capiscio-Server-Badge", ""),
+            )
+            
+            if identity["identity_present"]:
+                # Verify the extracted identity
+                result = client.mcp.verify_server_identity(
+                    server_did=identity["server_did"],
+                    server_badge=identity["server_badge"],
+                    transport_origin="https://files.example.com",
+                )
+        """
+        http_headers = mcp_pb2.MCPHttpHeaders(
+            capiscio_server_did=capiscio_server_did,
+            capiscio_server_badge=capiscio_server_badge,
+        )
+        
+        request = mcp_pb2.ParseServerIdentityRequest(http_headers=http_headers)
+        response = self._stub.ParseServerIdentity(request)
+        
+        return {
+            "server_did": response.server_did,
+            "server_badge": response.server_badge,
+            "identity_present": response.identity_present,
+        }
+    
+    def parse_server_identity_jsonrpc(self, meta_json: str) -> dict:
+        """Parse server identity from JSON-RPC _meta (RFC-007 §5.3).
+        
+        Extracts server identity from JSON-RPC _meta field. Use this
+        for stdio transport or any JSON-RPC based MCP connection.
+        
+        Args:
+            meta_json: JSON string of the _meta object containing
+                       "serverDid" and "serverBadge" fields
+            
+        Returns:
+            Dict with:
+                server_did: Extracted server DID
+                server_badge: Extracted server badge JWT
+                identity_present: Whether identity was present
+                
+        Example:
+            # Extract from JSON-RPC response
+            meta = response.get("_meta", {})
+            identity = client.mcp.parse_server_identity_jsonrpc(
+                meta_json=json.dumps(meta)
+            )
+            
+            if identity["identity_present"]:
+                # Verify the extracted identity
+                result = client.mcp.verify_server_identity(
+                    server_did=identity["server_did"],
+                    server_badge=identity["server_badge"],
+                    transport_origin="",  # N/A for stdio
+                )
+        """
+        jsonrpc_meta = mcp_pb2.MCPJsonRpcMeta(meta_json=meta_json)
+        
+        request = mcp_pb2.ParseServerIdentityRequest(jsonrpc_meta=jsonrpc_meta)
+        response = self._stub.ParseServerIdentity(request)
+        
+        return {
+            "server_did": response.server_did,
+            "server_badge": response.server_badge,
+            "identity_present": response.identity_present,
+        }
+    
+    def health(self, client_version: str = "") -> dict:
+        """Check MCP service health and version compatibility.
+        
+        Args:
+            client_version: Client's version for compatibility check
+            
+        Returns:
+            Dict with:
+                healthy: Whether service is healthy
+                core_version: capiscio-core version
+                proto_version: Proto/gRPC version
+                version_compatible: Whether versions are compatible
+        """
+        request = mcp_pb2.MCPHealthRequest(client_version=client_version)
+        response = self._stub.Health(request)
+        
+        return {
+            "healthy": response.healthy,
+            "core_version": response.core_version,
+            "proto_version": response.proto_version,
+            "version_compatible": response.version_compatible,
+        }
 
 
 class RegistryClient:

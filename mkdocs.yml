@@ -38,6 +38,10 @@ plugins:
             docstring_style: google
             show_source: true
             show_root_heading: true
+            show_if_no_docstring: false
+            allow_inspection: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
 
 markdown_extensions:
   - admonition
@@ -60,6 +64,7 @@ nav:
       - Core Concepts: getting-started/concepts.md
   - Guides:
       - Badge Verification: guides/badge-verification.md
+      - MCP Security: guides/mcp.md
       - Scoring System: guides/scoring.md
       - Configuration: guides/configuration.md
   - API Reference: api-reference.md
