@@ -38,6 +38,10 @@ plugins:
             docstring_style: google
             show_source: true
             show_root_heading: true
+            show_if_no_docstring: false
+            allow_inspection: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
 
 markdown_extensions:
   - admonition

@@ -1,6 +1,6 @@
 """gRPC client wrapper for capiscio-core."""
 
-from typing import Optional
+from typing import Generator, Optional
 
 import grpc
 
@@ -514,7 +514,7 @@ class BadgeClient:
         renew_before_seconds: int = 60,
         check_interval_seconds: int = 30,
         trust_level: int = 1,
-    ):
+    ) -> Generator[dict, None, None]:
         """Start a badge keeper daemon (RFC-002 §7.3).
         
         The keeper automatically renews badges before they expire, ensuring
@@ -534,8 +534,8 @@ class BadgeClient:
             trust_level: Trust level for CA mode (1-4, default: 1)
             
         Yields:
-            KeeperEvent dicts with: type, badge_jti, subject, trust_level,
-            expires_at, error, error_code, timestamp, token
+            dict: KeeperEvent dicts with keys: type, badge_jti, subject, trust_level,
+                expires_at, error, error_code, timestamp, token
             
         Example:
             # CA mode

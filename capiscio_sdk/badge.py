@@ -30,7 +30,7 @@ Example usage:
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Union
+from typing import Generator, List, Optional, Union
 
 from capiscio_sdk._rpc.client import CapiscioRPCClient
 
@@ -652,7 +652,7 @@ def start_badge_keeper(
     renew_before_seconds: int = 60,
     check_interval_seconds: int = 30,
     trust_level: Union[TrustLevel, str, int] = TrustLevel.LEVEL_1,
-):
+) -> Generator[dict, None, None]:
     """Start a badge keeper daemon (RFC-002 §7.3).
     
     The keeper automatically renews badges before they expire, ensuring
@@ -672,8 +672,8 @@ def start_badge_keeper(
         trust_level: Trust level for CA mode (1-4, default: 1)
         
     Yields:
-        KeeperEvent dicts with: type, badge_jti, subject, trust_level,
-        expires_at, error, error_code, timestamp, token
+        dict: KeeperEvent dicts with keys: type, badge_jti, subject, trust_level,
+            expires_at, error, error_code, timestamp, token
         
     Example:
         # CA mode - production
