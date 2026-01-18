@@ -64,16 +64,30 @@ class VerifyMode(Enum):
 
 
 class TrustLevel(Enum):
-    """Trust level as defined in RFC-002."""
+    """Trust level as defined in RFC-002 §5.
+    
+    Levels:
+        LEVEL_0 (SS): Self-Signed - did:key, iss == sub. Development only.
+        LEVEL_1 (REG): Registered - Account registration with CA.
+        LEVEL_2 (DV): Domain Validated - DNS/HTTP domain ownership proof.
+        LEVEL_3 (OV): Organization Validated - Legal entity verification.
+        LEVEL_4 (EV): Extended Validated - Manual review + security audit.
+    """
+
+    LEVEL_0 = "0"
+    """Self-Signed (SS) - did:key, iss == sub. Development only."""
 
     LEVEL_1 = "1"
-    """Domain Validated (DV) - Basic verification."""
+    """Registered (REG) - Account registration with CA."""
 
     LEVEL_2 = "2"
-    """Organization Validated (OV) - Business verification."""
+    """Domain Validated (DV) - DNS/HTTP domain ownership proof."""
 
     LEVEL_3 = "3"
-    """Extended Validation (EV) - Rigorous vetting."""
+    """Organization Validated (OV) - Legal entity verification."""
+
+    LEVEL_4 = "4"
+    """Extended Validated (EV) - Manual review + security audit."""
 
     @classmethod
     def from_string(cls, value: str) -> "TrustLevel":
@@ -81,7 +95,7 @@ class TrustLevel(Enum):
         for level in cls:
             if level.value == value:
                 return level
-        raise ValueError(f"Unknown trust level: {value}")
+        raise ValueError(f"Unknown trust level: {value}. Valid levels: 0 (SS), 1 (REG), 2 (DV), 3 (OV), 4 (EV)")
 
 
 @dataclass
@@ -90,15 +104,24 @@ class BadgeClaims:
 
     Attributes:
         jti: Unique badge identifier (UUID).
-        issuer: Badge issuer URL (CA).
+        issuer: Badge issuer URL (CA) or did:key for self-signed.
         subject: Agent DID (did:web format).
         audience: Optional list of intended audience URLs.
         issued_at: When the badge was issued.
         expires_at: When the badge expires.
-        trust_level: Trust level (1=DV, 2=OV, 3=EV).
+        trust_level: Trust level per RFC-002 §5:
+            - 0 (SS): Self-Signed - Development only
+            - 1 (REG): Registered - Account registration
+            - 2 (DV): Domain Validated - DNS/HTTP proof
+            - 3 (OV): Organization Validated - Legal entity
+            - 4 (EV): Extended Validated - Security audit
         domain: Agent's verified domain.
         agent_name: Human-readable agent name.
         agent_id: Extracted agent ID from subject DID.
+        ial: Identity Assurance Level (RFC-002 §7.2.1):
+            - "0": Account-attested (no key proof)
+            - "1": Proof of Possession (key holder verified, has cnf claim)
+        raw_claims: Original JWT claims dict for advanced access.
     """
 
     jti: str
@@ -110,6 +133,8 @@ class BadgeClaims:
     domain: str
     agent_name: str = ""
     audience: List[str] = field(default_factory=list)
+    ial: str = "0"  # RFC-002 §7.2.1: Default IAL-0 (account-attested)
+    raw_claims: Optional[dict] = field(default=None, repr=False)  # For advanced access
 
     @property
     def agent_id(self) -> str:
@@ -133,6 +158,11 @@ class BadgeClaims:
     @classmethod
     def from_dict(cls, data: dict) -> "BadgeClaims":
         """Create BadgeClaims from a dictionary."""
+        # Handle audience - can be string or list
+        aud = data.get("aud", [])
+        if isinstance(aud, str):
+            aud = [aud] if aud else []
+        
         return cls(
             jti=data.get("jti", ""),
             issuer=data.get("iss", ""),
@@ -142,12 +172,14 @@ class BadgeClaims:
             trust_level=TrustLevel.from_string(data.get("trust_level", "1")),
             domain=data.get("domain", ""),
             agent_name=data.get("agent_name", ""),
-            audience=data.get("aud", []),
+            audience=aud,
+            ial=data.get("ial", "0"),  # RFC-002 §7.2.1
+            raw_claims=data,  # Preserve for advanced access (cnf, key, etc.)
         )
 
     def to_dict(self) -> dict:
         """Convert to dictionary."""
-        return {
+        result = {
             "jti": self.jti,
             "iss": self.issuer,
             "sub": self.subject,
@@ -157,7 +189,31 @@ class BadgeClaims:
             "domain": self.domain,
             "agent_name": self.agent_name,
             "aud": self.audience,
+            "ial": self.ial,
         }
+        return result
+    
+    @property
+    def has_key_binding(self) -> bool:
+        """Check if this badge has IAL-1 key binding (cnf claim).
+        
+        Per RFC-002 §7.2.1, IAL-1 badges include a 'cnf' (confirmation) claim
+        that cryptographically binds the badge to the agent's private key.
+        """
+        if self.raw_claims is None:
+            return self.ial == "1"
+        return "cnf" in self.raw_claims
+    
+    @property
+    def confirmation_key(self) -> Optional[dict]:
+        """Get the confirmation key (cnf claim) if present.
+        
+        Returns the JWK thumbprint or key from the cnf claim for IAL-1 badges.
+        Returns None for IAL-0 badges or if cnf is not present.
+        """
+        if self.raw_claims is None:
+            return None
+        return self.raw_claims.get("cnf")
 
 
 @dataclass
@@ -454,7 +510,11 @@ async def request_badge(
         ca_url: Certificate Authority URL (default: CapiscIO registry).
         api_key: API key for authentication with the CA.
         domain: Agent's domain (required for verification).
-        trust_level: Requested trust level (1=DV, 2=OV, 3=EV).
+        trust_level: Requested trust level per RFC-002 §5:
+            - 1 (REG): Registered - Account registration
+            - 2 (DV): Domain Validated - DNS/HTTP proof
+            - 3 (OV): Organization Validated - Legal entity
+            - 4 (EV): Extended Validated - Security audit
         audience: Optional audience restrictions for the badge.
         timeout: Request timeout in seconds (not used with gRPC).
 
