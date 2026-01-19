@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "capiscio-sdk"
-version = "2.3.1"
+version = "2.4.0"
 description = "Runtime security middleware for A2A agents"
 readme = "README.md"
 requires-python = ">=3.10"
