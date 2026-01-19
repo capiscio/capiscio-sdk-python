@@ -1,5 +1,5 @@
 """FastAPI integration for Capiscio SimpleGuard."""
-from typing import Callable, Awaitable, Any, Dict
+from typing import Callable, Awaitable, Any, Dict, List, Optional
 try:
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.requests import Request
@@ -15,21 +15,33 @@ import time
 class CapiscioMiddleware(BaseHTTPMiddleware):
     """
     Middleware to enforce A2A identity verification on incoming requests.
+    
+    Args:
+        app: The ASGI application.
+        guard: SimpleGuard instance for verification.
+        exclude_paths: List of paths to skip verification (e.g., ["/health", "/.well-known/agent-card.json"]).
     """
-    def __init__(self, app: ASGIApp, guard: SimpleGuard) -> None:
+    def __init__(
+        self, 
+        app: ASGIApp, 
+        guard: SimpleGuard, 
+        exclude_paths: Optional[List[str]] = None
+    ) -> None:
         super().__init__(app)
         self.guard = guard
+        self.exclude_paths = exclude_paths or []
 
     async def dispatch(
         self, 
         request: Request, 
         call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        # Allow health checks or public endpoints if needed
-        # For now, we assume everything under /agent/ needs protection
-        # But let's just check for the header.
-        
+        # Allow CORS preflight
         if request.method == "OPTIONS":
+            return await call_next(request)
+        
+        # Skip verification for excluded paths
+        if request.url.path in self.exclude_paths:
             return await call_next(request)
 
         # RFC-002 §9.1: X-Capiscio-Badge header

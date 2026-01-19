@@ -104,3 +104,44 @@ def test_middleware_invalid_signature(client, mock_guard):
     
     assert response.status_code == 403
     assert "Access Denied" in response.json()["error"]
+
+
+def test_middleware_exclude_paths():
+    """Test that exclude_paths parameter allows bypassing verification."""
+    mock_guard = MagicMock()
+    mock_guard.agent_id = "test-agent"
+    
+    app = FastAPI()
+    app.add_middleware(
+        CapiscioMiddleware, 
+        guard=mock_guard,
+        exclude_paths=["/health", "/.well-known/agent-card.json"]
+    )
+    
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
+    
+    @app.get("/.well-known/agent-card.json")
+    async def agent_card():
+        return {"name": "Test Agent"}
+    
+    @app.post("/protected")
+    async def protected():
+        return {"secret": "data"}
+    
+    client = TestClient(app)
+    
+    # Excluded paths should work without header
+    response = client.get("/health")
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    
+    response = client.get("/.well-known/agent-card.json")
+    assert response.status_code == 200
+    assert response.json()["name"] == "Test Agent"
+    
+    # Non-excluded paths should require header
+    response = client.post("/protected", json={})
+    assert response.status_code == 401
+    assert "Missing X-Capiscio-Badge" in response.json()["error"]

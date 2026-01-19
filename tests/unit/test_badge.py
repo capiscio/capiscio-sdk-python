@@ -25,21 +25,29 @@ class TestTrustLevel:
     """Tests for TrustLevel enum."""
 
     def test_from_string_valid(self):
-        """Test parsing valid trust levels."""
-        assert TrustLevel.from_string("1") == TrustLevel.LEVEL_1
-        assert TrustLevel.from_string("2") == TrustLevel.LEVEL_2
-        assert TrustLevel.from_string("3") == TrustLevel.LEVEL_3
+        """Test parsing valid trust levels (RFC-002 §5)."""
+        assert TrustLevel.from_string("0") == TrustLevel.LEVEL_0  # Self-Signed (SS)
+        assert TrustLevel.from_string("1") == TrustLevel.LEVEL_1  # Registered (REG)
+        assert TrustLevel.from_string("2") == TrustLevel.LEVEL_2  # Domain Validated (DV)
+        assert TrustLevel.from_string("3") == TrustLevel.LEVEL_3  # Organization Validated (OV)
+        assert TrustLevel.from_string("4") == TrustLevel.LEVEL_4  # Extended Validated (EV)
 
     def test_from_string_invalid(self):
         """Test parsing invalid trust level raises error."""
         with pytest.raises(ValueError, match="Unknown trust level"):
-            TrustLevel.from_string("4")
+            TrustLevel.from_string("5")  # Invalid - only 0-4 exist
+        with pytest.raises(ValueError, match="Unknown trust level"):
+            TrustLevel.from_string("99")
+        with pytest.raises(ValueError, match="Unknown trust level"):
+            TrustLevel.from_string("invalid")
 
     def test_value_property(self):
         """Test value property returns string."""
+        assert TrustLevel.LEVEL_0.value == "0"
         assert TrustLevel.LEVEL_1.value == "1"
         assert TrustLevel.LEVEL_2.value == "2"
         assert TrustLevel.LEVEL_3.value == "3"
+        assert TrustLevel.LEVEL_4.value == "4"
 
 
 class TestVerifyMode:
@@ -167,6 +175,72 @@ class TestBadgeClaims:
         assert data["domain"] == "example.com"
         assert data["agent_name"] == "Test Agent"
         assert data["aud"] == ["https://service.example.com"]
+        assert data["ial"] == "0"  # Default IAL-0
+
+    def test_ial_claim_parsing(self):
+        """Test IAL claim is correctly parsed from dict (RFC-002 §7.2.1)."""
+        # IAL-0 badge (account-attested, no key proof)
+        data_ial0 = {
+            "jti": "badge-ial0",
+            "iss": "https://registry.capisc.io",
+            "sub": "did:web:registry.capisc.io:agents:agent1",
+            "iat": 1704067200,
+            "exp": 1735689600,
+            "trust_level": "1",
+            "domain": "example.com",
+            "ial": "0",
+        }
+        claims_ial0 = BadgeClaims.from_dict(data_ial0)
+        assert claims_ial0.ial == "0"
+        assert not claims_ial0.has_key_binding
+
+        # IAL-1 badge (proof of possession, with cnf claim)
+        data_ial1 = {
+            "jti": "badge-ial1",
+            "iss": "https://registry.capisc.io",
+            "sub": "did:web:registry.capisc.io:agents:agent2",
+            "iat": 1704067200,
+            "exp": 1735689600,
+            "trust_level": "1",
+            "domain": "example.com",
+            "ial": "1",
+            "cnf": {"jkt": "sha256-thumbprint-of-key"},
+        }
+        claims_ial1 = BadgeClaims.from_dict(data_ial1)
+        assert claims_ial1.ial == "1"
+        assert claims_ial1.has_key_binding
+        assert claims_ial1.confirmation_key == {"jkt": "sha256-thumbprint-of-key"}
+
+    def test_raw_claims_preserved(self):
+        """Test raw_claims dict is preserved for advanced access."""
+        data = {
+            "jti": "badge-raw",
+            "iss": "https://registry.capisc.io",
+            "sub": "did:web:registry.capisc.io:agents:test",
+            "iat": 1704067200,
+            "exp": 1735689600,
+            "trust_level": "2",
+            "domain": "example.com",
+            "custom_claim": "custom_value",  # Non-standard claim
+        }
+        claims = BadgeClaims.from_dict(data)
+        assert claims.raw_claims is not None
+        assert claims.raw_claims.get("custom_claim") == "custom_value"
+
+    def test_audience_string_to_list(self):
+        """Test audience string is converted to list."""
+        data = {
+            "jti": "badge-aud",
+            "iss": "https://registry.capisc.io",
+            "sub": "did:web:registry.capisc.io:agents:test",
+            "iat": 1704067200,
+            "exp": 1735689600,
+            "trust_level": "1",
+            "domain": "example.com",
+            "aud": "https://single-audience.example.com",  # String, not list
+        }
+        claims = BadgeClaims.from_dict(data)
+        assert claims.audience == ["https://single-audience.example.com"]
 
 
 class TestVerifyOptions:
