@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "capiscio-sdk"
-version = "2.4.0"
+version = "2.3.1"
 description = "Runtime security middleware for A2A agents"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -69,10 +69,6 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-markers = [
-    "integration: marks tests as integration tests (require external services)",
-    "slow: marks tests as slow (deselect with '-m not slow')",
-]
 
 [tool.coverage.run]
 source = ["capiscio_sdk"]
