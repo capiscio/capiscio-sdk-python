@@ -178,7 +178,11 @@ class BadgeClaims:
         )
 
     def to_dict(self) -> dict:
-        """Convert to dictionary."""
+        """Convert to dictionary.
+        
+        Preserves the cnf (confirmation) claim for IAL-1 badges to support
+        round-trip serialization.
+        """
         result = {
             "jti": self.jti,
             "iss": self.issuer,
@@ -191,18 +195,23 @@ class BadgeClaims:
             "aud": self.audience,
             "ial": self.ial,
         }
+        # Preserve cnf claim for IAL-1 / key-bound badges if it was present
+        if self.raw_claims is not None and "cnf" in self.raw_claims:
+            result["cnf"] = self.raw_claims["cnf"]
         return result
     
     @property
     def has_key_binding(self) -> bool:
-        """Check if this badge has IAL-1 key binding (cnf claim).
+        """Check if this badge has IAL-1 key binding (ial='1' and cnf claim).
         
-        Per RFC-002 §7.2.1, IAL-1 badges include a 'cnf' (confirmation) claim
+        Per RFC-002 §7.2.1, IAL-1 badges MUST include a 'cnf' (confirmation) claim
         that cryptographically binds the badge to the agent's private key.
         """
-        if self.raw_claims is None:
-            return self.ial == "1"
-        return "cnf" in self.raw_claims
+        return (
+            self.ial == "1"
+            and self.raw_claims is not None
+            and "cnf" in self.raw_claims
+        )
     
     @property
     def confirmation_key(self) -> Optional[dict]:
@@ -515,6 +524,7 @@ async def request_badge(
             - 2 (DV): Domain Validated - DNS/HTTP proof
             - 3 (OV): Organization Validated - Legal entity
             - 4 (EV): Extended Validated - Security audit
+            Note: LEVEL_0 (Self-Signed) is not available via CA request.
         audience: Optional audience restrictions for the badge.
         timeout: Request timeout in seconds (not used with gRPC).
 
