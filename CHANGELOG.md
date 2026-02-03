@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-01-18
+
+### Fixed
+- **RFC-002 Alignment**: TrustLevel enum values now match RFC-002 §5 exactly
+- **BadgeClaims**: Aligned claim field names with RFC-002 specification
+
+### Added
+- **MCP Service Client**: RFC-006/RFC-007 operations via MCP protocol
+- **MCP gRPC Client**: Server identity operations
+
 ## [2.3.1] - 2025-01-14
 
 ### Fixed
