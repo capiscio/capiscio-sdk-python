@@ -334,7 +334,7 @@ def is_production_ready(result: ValidationResult) -> bool:
 
     Command-line usage with `--detailed-scores` flag and JSON output.
 
-    [:octicons-arrow-right-24: CLI Usage](https://docs.capisc.io/capiscio-cli/scoring-system/)
+    [:octicons-arrow-right-24: CLI Usage](https://docs.capisc.io/reference/cli/#validate)
 
 -   **📖 Core Concepts**
 
