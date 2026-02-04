@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **RFC-002 Alignment**: TrustLevel enum values now match RFC-002 §5 exactly
 - **BadgeClaims**: Aligned claim field names with RFC-002 specification
+- **to_dict()**: Now preserves `cnf` claim for IAL-1 badges (round-trip serialization)
+- **has_key_binding**: Consistently checks both `ial=='1'` AND `cnf` presence
 
 ### Added
 - **MCP Service Client**: RFC-006/RFC-007 operations via MCP protocol
