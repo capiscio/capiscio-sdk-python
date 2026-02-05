@@ -9,6 +9,7 @@ from capiscio_sdk.connect import (
     AgentIdentity,
     CapiscIO,
     _Connector,
+    ConfigurationError,
     DEFAULT_CONFIG_DIR,
     DEFAULT_KEYS_DIR,
     PROD_REGISTRY,
@@ -454,6 +455,348 @@ class TestConnector:
             "protocol": "a2a",
         })
         assert result == {"id": "new-agent-id", "name": "New Agent"}
+
+    def test_ensure_agent_fetch_error(self):
+        """Test _ensure_agent raises on server error."""
+        connector = _Connector(
+            api_key="sk_test",
+            name=None,
+            agent_id="some-agent",
+            server_url="https://test.server.com",
+            keys_dir=None,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "Internal Server Error"
+        connector._client.get = MagicMock(return_value=mock_response)
+        
+        with pytest.raises(RuntimeError, match="Failed to fetch agent"):
+            connector._ensure_agent()
+
+    def test_ensure_agent_list_error(self):
+        """Test _ensure_agent raises when listing fails."""
+        connector = _Connector(
+            api_key="sk_test",
+            name=None,
+            agent_id=None,
+            server_url="https://test.server.com",
+            keys_dir=None,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 500
+        mock_response.text = "Failed to list"
+        connector._client.get = MagicMock(return_value=mock_response)
+        
+        with pytest.raises(RuntimeError, match="Failed to list agents"):
+            connector._ensure_agent()
+
+    def test_ensure_agent_creates_when_empty(self):
+        """Test _ensure_agent creates agent when list is empty."""
+        connector = _Connector(
+            api_key="sk_test",
+            name=None,
+            agent_id=None,
+            server_url="https://test.server.com",
+            keys_dir=None,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        # First call returns empty list, second call creates
+        list_response = MagicMock()
+        list_response.status_code = 200
+        list_response.json.return_value = {"data": []}
+        
+        create_response = MagicMock()
+        create_response.status_code = 201
+        create_response.json.return_value = {"data": {"id": "new-id", "name": "New"}}
+        
+        connector._client.get = MagicMock(return_value=list_response)
+        connector._client.post = MagicMock(return_value=create_response)
+        
+        result = connector._ensure_agent()
+        
+        assert result == {"id": "new-id", "name": "New"}
+        connector._client.post.assert_called_once()
+
+    def test_create_agent_generates_name(self):
+        """Test _create_agent generates name when not provided."""
+        connector = _Connector(
+            api_key="sk_test",
+            name=None,
+            agent_id=None,
+            server_url="https://test.server.com",
+            keys_dir=None,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 201
+        mock_response.json.return_value = {"data": {"id": "new-id", "name": "Agent-abc123"}}
+        connector._client.post = MagicMock(return_value=mock_response)
+        
+        result = connector._create_agent()
+        
+        # Name should start with "Agent-"
+        call_args = connector._client.post.call_args
+        assert call_args[1]["json"]["name"].startswith("Agent-")
+
+    def test_create_agent_failure(self):
+        """Test _create_agent raises on failure."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id=None,
+            server_url="https://test.server.com",
+            keys_dir=None,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        mock_response = MagicMock()
+        mock_response.status_code = 400
+        mock_response.text = "Bad request"
+        connector._client.post = MagicMock(return_value=mock_response)
+        
+        with pytest.raises(RuntimeError, match="Failed to create agent"):
+            connector._create_agent()
+
+    def test_connect_full_flow(self, tmp_path):
+        """Test connect() executes full flow."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test Agent",
+            agent_id=None,
+            server_url="https://test.server.com",
+            keys_dir=tmp_path / "keys",
+            auto_badge=False,  # Skip badge setup for simplicity
+            dev_mode=False,
+        )
+        
+        # Mock _ensure_agent
+        connector._ensure_agent = MagicMock(return_value={
+            "id": "agent-123",
+            "name": "Test Agent",
+        })
+        
+        # Mock _init_identity  
+        connector._init_identity = MagicMock(return_value="did:key:z6MkTest")
+        
+        result = connector.connect()
+        
+        assert result.agent_id == "agent-123"
+        assert result.did == "did:key:z6MkTest"
+        assert result.name == "Test Agent"
+        assert result.keys_dir == tmp_path / "keys"
+        connector._ensure_agent.assert_called_once()
+        connector._init_identity.assert_called_once()
+
+    def test_connect_with_auto_badge(self, tmp_path):
+        """Test connect() sets up badge when auto_badge=True."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test Agent",
+            agent_id=None,
+            server_url="https://test.server.com",
+            keys_dir=tmp_path / "keys",
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        connector._ensure_agent = MagicMock(return_value={
+            "id": "agent-123",
+            "name": "Test Agent",
+        })
+        connector._init_identity = MagicMock(return_value="did:key:z6MkTest")
+        connector._setup_badge = MagicMock(return_value=(
+            "badge-jwt",
+            "2026-12-31T00:00:00Z",
+            MagicMock(),  # keeper
+            MagicMock(),  # guard
+        ))
+        
+        result = connector.connect()
+        
+        assert result.badge == "badge-jwt"
+        assert result.badge_expires_at == "2026-12-31T00:00:00Z"
+        connector._setup_badge.assert_called_once()
+
+    def test_connect_skips_badge_in_dev_mode(self, tmp_path):
+        """Test connect() skips badge in dev_mode."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test Agent",
+            agent_id=None,
+            server_url="https://test.server.com",
+            keys_dir=tmp_path / "keys",
+            auto_badge=True,
+            dev_mode=True,  # Dev mode should skip badge
+        )
+        
+        connector._ensure_agent = MagicMock(return_value={
+            "id": "agent-123",
+            "name": "Test Agent",
+        })
+        connector._init_identity = MagicMock(return_value="did:key:z6MkTest")
+        connector._setup_badge = MagicMock()
+        
+        result = connector.connect()
+        
+        assert result.badge is None
+        connector._setup_badge.assert_not_called()
+
+    def test_connect_generates_name_from_id(self, tmp_path):
+        """Test connect() generates name from agent ID when missing."""
+        connector = _Connector(
+            api_key="sk_test",
+            name=None,
+            agent_id=None,
+            server_url="https://test.server.com",
+            keys_dir=tmp_path / "keys",
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        connector._ensure_agent = MagicMock(return_value={
+            "id": "agent-123456789",
+            "name": None,  # No name from server
+        })
+        connector._init_identity = MagicMock(return_value="did:key:z6MkTest")
+        
+        result = connector.connect()
+        
+        # Should generate name from first 8 chars of ID
+        assert result.name == "Agent-agent-12"
+
+    def test_init_identity_uses_existing(self, tmp_path):
+        """Test _init_identity returns existing DID if files exist."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        # Create existing identity files
+        (tmp_path / "did.txt").write_text("did:key:z6MkExisting")
+        (tmp_path / "private.jwk").write_text('{"kty":"OKP"}')
+        
+        result = connector._init_identity()
+        
+        assert result == "did:key:z6MkExisting"
+
+    def test_init_identity_calls_rpc(self, tmp_path):
+        """Test _init_identity calls capiscio-core RPC."""
+        from capiscio_sdk.connect import ConfigurationError
+        
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        mock_rpc = MagicMock()
+        mock_rpc.simpleguard.init.return_value = (
+            {"did": "did:key:z6MkNew", "registered": True},
+            None,
+        )
+        
+        with patch("capiscio_sdk.connect.CapiscioRPCClient", return_value=mock_rpc):
+            result = connector._init_identity()
+        
+        assert result == "did:key:z6MkNew"
+        mock_rpc.connect.assert_called_once()
+        mock_rpc.simpleguard.init.assert_called_once_with(
+            api_key="sk_test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            output_dir=str(tmp_path),
+            force=False,
+        )
+
+    def test_init_identity_rpc_error(self, tmp_path):
+        """Test _init_identity raises on RPC error."""
+        from capiscio_sdk.connect import ConfigurationError
+        
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        mock_rpc = MagicMock()
+        mock_rpc.simpleguard.init.return_value = (None, "RPC failed")
+        
+        with patch("capiscio_sdk.connect.CapiscioRPCClient", return_value=mock_rpc):
+            with pytest.raises(ConfigurationError, match="Failed to initialize identity"):
+                connector._init_identity()
+
+    def test_setup_badge_success(self, tmp_path):
+        """Test _setup_badge sets up keeper and guard."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        mock_keeper = MagicMock()
+        mock_keeper.get_current_badge.return_value = "badge-jwt"
+        mock_keeper.badge_expires_at = "2026-12-31T00:00:00Z"
+        
+        mock_guard = MagicMock()
+        
+        with patch("capiscio_sdk.badge_keeper.BadgeKeeper", return_value=mock_keeper):
+            with patch("capiscio_sdk.simple_guard.SimpleGuard", return_value=mock_guard):
+                badge, expires, keeper, guard = connector._setup_badge()
+        
+        assert badge == "badge-jwt"
+        assert expires == "2026-12-31T00:00:00Z"
+        assert keeper == mock_keeper
+        assert guard == mock_guard
+        mock_keeper.start.assert_called_once()
+        mock_keeper.get_current_badge.assert_called_once()
+
+    def test_setup_badge_failure_continues(self, tmp_path):
+        """Test _setup_badge returns None on failure without raising."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        with patch("capiscio_sdk.badge_keeper.BadgeKeeper", side_effect=Exception("Setup failed")):
+            badge, expires, keeper, guard = connector._setup_badge()
+        
+        assert badge is None
+        assert expires is None
+        assert keeper is None
+        assert guard is None
 
 
 class TestDefaultPaths:
