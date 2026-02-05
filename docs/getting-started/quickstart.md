@@ -1,8 +1,50 @@
 # Quick Start
 
-Get your A2A agent protected in **5 minutes** with the CapiscIO Python SDK.
+Get your A2A agent up and running with CapiscIO in **under 60 seconds**.
 
-## See the Difference
+## Step 1: Get Your Agent Identity (One Line)
+
+Just like Let's Encrypt made HTTPS easy, CapiscIO makes agent identity easy:
+
+```python
+from capiscio_sdk import CapiscIO
+
+# One line - handles everything automatically
+agent = CapiscIO.connect(api_key="sk_live_...")
+
+print(agent.did)    # did:key:z6Mk... - your agent's identity
+print(agent.badge)  # Your trust badge
+```
+
+**What happens automatically:**
+
+- ✅ Ed25519 key pair generated
+- ✅ `did:key` identity derived (RFC-002 compliant)
+- ✅ DID registered with CapiscIO registry  
+- ✅ Agent card created
+- ✅ Trust badge requested
+
+### Using Environment Variables (Recommended for Production)
+
+```python
+from capiscio_sdk import CapiscIO
+
+# Reads CAPISCIO_API_KEY from environment
+agent = CapiscIO.from_env()
+```
+
+### Two Setup Paths
+
+| Path | When to Use | Code |
+|------|-------------|------|
+| **Quick Start** | Getting started, single agent | `CapiscIO.connect(api_key="...")` |
+| **UI-First** | Teams, multiple agents | `CapiscIO.connect(api_key="...", agent_id="agt_123")` |
+
+---
+
+## Step 2: Secure Your Agent (Optional but Recommended)
+
+Now protect your agent from attacks:
 
 ### ❌ Without Security
 
@@ -40,7 +82,7 @@ secured_agent = secure(MyAgentExecutor())
 ## Prerequisites
 
 - Python 3.10 or higher
-- An existing A2A agent executor
+- A CapiscIO API key ([get one free](https://app.capisc.io))
 - Basic familiarity with the [A2A protocol](https://github.com/google/A2A)
 
 ## Installation
@@ -55,11 +97,17 @@ pip install capiscio-sdk
 The fastest way to add security to your agent:
 
 ```python
-from capiscio_sdk import secure
+from capiscio_sdk import CapiscIO, secure
 from my_agent import MyAgentExecutor
 
-# Wrap your agent with security (production defaults)
+# 1. Get your agent identity (one line)
+agent = CapiscIO.connect(api_key="sk_live_...")
+
+# 2. Wrap your agent with security (one line)
 secured_agent = secure(MyAgentExecutor())
+
+# Your agent now has identity AND security
+print(f"Agent DID: {agent.did}")
 
 # Validate an agent card and access scores
 result = await secured_agent.validate_agent_card(card_url)
@@ -68,6 +116,8 @@ print(result.compliance.total, result.trust.total, result.availability.total)
 
 That's it! Your agent now has:
 
+- ✅ Cryptographic identity (`did:key`)
+- ✅ Trust badge (auto-renewed)
 - ✅ Message validation
 - ✅ Protocol compliance checking
 - ✅ Rate limiting (60 requests/minute)

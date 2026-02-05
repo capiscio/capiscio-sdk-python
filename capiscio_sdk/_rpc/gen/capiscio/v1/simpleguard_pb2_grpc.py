@@ -55,6 +55,11 @@ class SimpleGuardServiceStub(object):
                 request_serializer=capiscio_dot_v1_dot_simpleguard__pb2.GetKeyInfoRequest.SerializeToString,
                 response_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.GetKeyInfoResponse.FromString,
                 _registered_method=True)
+        self.Init = channel.unary_unary(
+                '/capiscio.v1.SimpleGuardService/Init',
+                request_serializer=capiscio_dot_v1_dot_simpleguard__pb2.InitRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.InitResponse.FromString,
+                _registered_method=True)
 
 
 class SimpleGuardServiceServicer(object):
@@ -117,6 +122,14 @@ class SimpleGuardServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def Init(self, request, context):
+        """Initialize agent identity (Let's Encrypt style one-call setup)
+        Generates key pair, derives DID, registers with server, creates agent card
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_SimpleGuardServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -159,6 +172,11 @@ def add_SimpleGuardServiceServicer_to_server(servicer, server):
                     servicer.GetKeyInfo,
                     request_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.GetKeyInfoRequest.FromString,
                     response_serializer=capiscio_dot_v1_dot_simpleguard__pb2.GetKeyInfoResponse.SerializeToString,
+            ),
+            'Init': grpc.unary_unary_rpc_method_handler(
+                    servicer.Init,
+                    request_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.InitRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_simpleguard__pb2.InitResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -378,6 +396,33 @@ class SimpleGuardService(object):
             '/capiscio.v1.SimpleGuardService/GetKeyInfo',
             capiscio_dot_v1_dot_simpleguard__pb2.GetKeyInfoRequest.SerializeToString,
             capiscio_dot_v1_dot_simpleguard__pb2.GetKeyInfoResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def Init(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.SimpleGuardService/Init',
+            capiscio_dot_v1_dot_simpleguard__pb2.InitRequest.SerializeToString,
+            capiscio_dot_v1_dot_simpleguard__pb2.InitResponse.FromString,
             options,
             channel_credentials,
             insecure,
