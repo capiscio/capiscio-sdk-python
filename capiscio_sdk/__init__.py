@@ -60,6 +60,12 @@ from .dv import (
     DVGrant,
 )
 
+# Easy connect API ("Let's Encrypt" style)
+from .connect import CapiscIO, connect, from_env, AgentIdentity
+
+# Event emission
+from .events import EventEmitter
+
 __all__ = [
     "__version__",
     # Security middleware
@@ -106,5 +112,12 @@ __all__ = [
     "finalize_dv_order",
     "DVOrder",
     "DVGrant",
+    # Easy Connect API ("Let's Encrypt" style)
+    "CapiscIO",
+    "connect",
+    "from_env",
+    "AgentIdentity",
+    # Event emission
+    "EventEmitter",
 ]
 

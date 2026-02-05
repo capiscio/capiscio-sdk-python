@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-from capiscio_sdk._rpc.gen.capiscio.v1 import mcp_pb2 as capiscio_dot_v1_dot_mcp__pb2
+from capiscio.v1 import mcp_pb2 as capiscio_dot_v1_dot_mcp__pb2
 
 
 class MCPServiceStub(object):

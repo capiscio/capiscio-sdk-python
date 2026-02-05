@@ -1275,6 +1275,55 @@ class SimpleGuardClient:
             "has_private_key": response.has_private_key,
             "public_key_pem": response.public_key_pem,
         }, None
+    
+    def init(
+        self,
+        api_key: str = "",
+        agent_id: str = "",
+        server_url: str = "",
+        output_dir: str = "",
+        force: bool = False,
+        metadata: Optional[dict] = None,
+    ) -> tuple[Optional[dict], Optional[str]]:
+        """Initialize agent identity - Let's Encrypt style one-call setup.
+        
+        Generates key pair, derives DID, registers with server, and creates agent card.
+        All cryptographic operations are performed by capiscio-core Go library.
+        
+        Args:
+            api_key: API key for server authentication
+            agent_id: Agent UUID to register DID for
+            server_url: CapiscIO server URL (default: https://api.capisc.io)
+            output_dir: Directory for generated files (default: .capiscio)
+            force: Overwrite existing files
+            metadata: Additional metadata for agent card
+            
+        Returns:
+            Tuple of (init_result, error_message)
+            init_result contains: did, agent_id, private_key_path, public_key_path,
+                                 agent_card_path, agent_card_json, registered
+        """
+        request = simpleguard_pb2.InitRequest(
+            api_key=api_key,
+            agent_id=agent_id,
+            server_url=server_url,
+            output_dir=output_dir,
+            force=force,
+            metadata=metadata or {},
+        )
+        response = self._stub.Init(request)
+        error = response.error_message if response.error_message else None
+        if error:
+            return None, error
+        return {
+            "did": response.did,
+            "agent_id": response.agent_id,
+            "private_key_path": response.private_key_path,
+            "public_key_path": response.public_key_path,
+            "agent_card_path": response.agent_card_path,
+            "agent_card_json": response.agent_card_json,
+            "registered": response.registered,
+        }, None
 
 
 class MCPClient:
