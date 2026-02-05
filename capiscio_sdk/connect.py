@@ -17,7 +17,6 @@ Usage:
 """
 
 import os
-import json
 import logging
 import httpx
 from pathlib import Path
@@ -69,7 +68,7 @@ class AgentIdentity:
     def get_badge(self) -> Optional[str]:
         """Get current badge (auto-renewed if needed)."""
         if self._keeper:
-            return self._keeper.get_badge()
+            return self._keeper.get_current_badge()
         return self.badge
     
     def status(self) -> Dict[str, Any]:
@@ -379,7 +378,7 @@ class _Connector:
             
             # Start the keeper and get initial badge
             keeper.start()
-            badge = keeper.get_badge()
+            badge = keeper.get_current_badge()
             expires_at = getattr(keeper, 'badge_expires_at', None)
             
             return badge, expires_at, keeper, guard

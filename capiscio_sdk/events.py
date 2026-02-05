@@ -18,7 +18,6 @@ Example:
     emitter.emit("task_completed", {"task_id": "123", "output": "..."})
 """
 
-import json
 import logging
 import time
 import uuid
