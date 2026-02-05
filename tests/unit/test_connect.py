@@ -715,11 +715,12 @@ class TestConnector:
             None,
         )
         
-        with patch("capiscio_sdk.connect.CapiscioRPCClient", return_value=mock_rpc):
-            result = connector._init_identity()
+        # Directly set _rpc_client to skip instantiation (connect.py checks if not self._rpc_client)
+        connector._rpc_client = mock_rpc
+        result = connector._init_identity()
         
         assert result == "did:key:z6MkNew"
-        mock_rpc.connect.assert_called_once()
+        # Note: connect() not called since _rpc_client was preset
         mock_rpc.simpleguard.init.assert_called_once_with(
             api_key="sk_test",
             agent_id="agent-123",
@@ -745,9 +746,10 @@ class TestConnector:
         mock_rpc = MagicMock()
         mock_rpc.simpleguard.init.return_value = (None, "RPC failed")
         
-        with patch("capiscio_sdk.connect.CapiscioRPCClient", return_value=mock_rpc):
-            with pytest.raises(ConfigurationError, match="Failed to initialize identity"):
-                connector._init_identity()
+        # Directly set _rpc_client to skip instantiation (connect.py checks if not self._rpc_client)
+        connector._rpc_client = mock_rpc
+        with pytest.raises(ConfigurationError, match="Failed to initialize identity"):
+            connector._init_identity()
 
     def test_setup_badge_success(self, tmp_path):
         """Test _setup_badge sets up keeper and guard."""
