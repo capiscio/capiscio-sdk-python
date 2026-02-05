@@ -19,6 +19,7 @@ Example:
 """
 
 import logging
+import threading
 import time
 import uuid
 from datetime import datetime, timezone
@@ -90,6 +91,7 @@ class EventEmitter:
         
         self._client = httpx.Client(timeout=10.0)
         self._batch: list = []
+        self._batch_lock = threading.Lock()
         self._last_flush = time.time()
         
         # Validate config
@@ -141,10 +143,12 @@ class EventEmitter:
         if correlation_id:
             event["correlationId"] = correlation_id
         
-        self._batch.append(event)
+        with self._batch_lock:
+            self._batch.append(event)
+            should_flush = flush or len(self._batch) >= self.batch_size
         
         # Flush if batch is full or flush requested
-        if flush or len(self._batch) >= self.batch_size:
+        if should_flush:
             return self.flush()
         
         # Flush if interval exceeded
@@ -164,11 +168,13 @@ class EventEmitter:
             return True
         
         if not self.enabled:
-            self._batch.clear()
+            with self._batch_lock:
+                self._batch.clear()
             return False
         
-        events_to_send = self._batch.copy()
-        self._batch.clear()
+        with self._batch_lock:
+            events_to_send = self._batch.copy()
+            self._batch.clear()
         self._last_flush = time.time()
         
         try:
@@ -190,13 +196,15 @@ class EventEmitter:
             else:
                 logger.warning(f"Failed to send events: {response.status_code} {response.text}")
                 # Re-queue events on failure
-                self._batch.extend(events_to_send)
+                with self._batch_lock:
+                    self._batch.extend(events_to_send)
                 return False
                 
         except Exception as e:
             logger.error(f"Error sending events: {e}")
             # Re-queue events on failure
-            self._batch.extend(events_to_send)
+            with self._batch_lock:
+                self._batch.extend(events_to_send)
             return False
     
     def task_started(self, task_id: str, input_text: str, **kwargs) -> bool:

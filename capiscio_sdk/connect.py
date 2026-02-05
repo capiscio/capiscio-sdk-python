@@ -81,6 +81,25 @@ class AgentIdentity:
             "badge_valid": self.badge is not None,
             "badge_expires_at": self.badge_expires_at,
         }
+    
+    def close(self) -> None:
+        """Clean up resources."""
+        if self._emitter:
+            self._emitter.close()
+            self._emitter = None
+        if self._keeper:
+            try:
+                self._keeper.stop()
+            except Exception:
+                pass
+            self._keeper = None
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
 
 
 class CapiscIO:
@@ -215,45 +234,54 @@ class _Connector:
         """Execute the full connection flow."""
         logger.info("Connecting to CapiscIO...")
         
-        # Step 1: Find or create agent
-        agent_data = self._ensure_agent()
-        self.agent_id = agent_data["id"]
-        self.name = agent_data.get("name") or self.name or f"Agent-{self.agent_id[:8]}"
-        
-        logger.info(f"Agent: {self.name} ({self.agent_id})")
-        
-        # Step 2: Set up keys directory
-        if not self.keys_dir:
-            self.keys_dir = DEFAULT_KEYS_DIR / self.agent_id
-        self.keys_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Step 3: Initialize identity via capiscio-core Init RPC (one call does everything)
-        did = self._init_identity()
-        logger.info(f"DID: {did}")
-        
-        # Step 4: Set up badge (if auto_badge)
-        badge = None
-        badge_expires_at = None
-        keeper = None
-        guard = None
-        
-        if self.auto_badge and not self.dev_mode:
-            badge, badge_expires_at, keeper, guard = self._setup_badge()
-            if badge:
-                logger.info(f"Badge acquired (expires: {badge_expires_at})")
-        
-        return AgentIdentity(
-            agent_id=self.agent_id,
-            did=did,
-            name=self.name,
-            api_key=self.api_key,
-            server_url=self.server_url,
-            keys_dir=self.keys_dir,
-            badge=badge,
-            badge_expires_at=badge_expires_at,
-            _guard=guard,
-            _keeper=keeper,
-        )
+        try:
+            # Step 1: Find or create agent
+            agent_data = self._ensure_agent()
+            self.agent_id = agent_data["id"]
+            self.name = agent_data.get("name") or self.name or f"Agent-{self.agent_id[:8]}"
+            
+            logger.info(f"Agent: {self.name} ({self.agent_id})")
+            
+            # Step 2: Set up keys directory
+            if not self.keys_dir:
+                self.keys_dir = DEFAULT_KEYS_DIR / self.agent_id
+            self.keys_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Step 3: Initialize identity via capiscio-core Init RPC (one call does everything)
+            did = self._init_identity()
+            logger.info(f"DID: {did}")
+            
+            # Step 4: Set up badge (if auto_badge)
+            badge = None
+            badge_expires_at = None
+            keeper = None
+            guard = None
+            
+            if self.auto_badge and not self.dev_mode:
+                badge, badge_expires_at, keeper, guard = self._setup_badge()
+                if badge:
+                    logger.info(f"Badge acquired (expires: {badge_expires_at})")
+            
+            return AgentIdentity(
+                agent_id=self.agent_id,
+                did=did,
+                name=self.name,
+                api_key=self.api_key,
+                server_url=self.server_url,
+                keys_dir=self.keys_dir,
+                badge=badge,
+                badge_expires_at=badge_expires_at,
+                _guard=guard,
+                _keeper=keeper,
+            )
+        finally:
+            # Clean up clients to avoid resource leaks
+            if self._rpc_client:
+                try:
+                    self._rpc_client.close()
+                except Exception:
+                    pass
+            self._client.close()
     
     def _ensure_agent(self) -> Dict[str, Any]:
         """Find existing agent or create new one."""
@@ -341,7 +369,9 @@ class _Connector:
         )
         
         if error:
-            raise ConfigurationError(f"Failed to initialize identity: {error}")
+            # Log detailed error for debugging, but avoid exposing it in the exception
+            logger.error(f"Init RPC failed during identity initialization: {error}")
+            raise ConfigurationError("Failed to initialize identity. Check logs for details.")
         
         did = result["did"]
         
@@ -379,7 +409,12 @@ class _Connector:
             # Start the keeper and get initial badge
             keeper.start()
             badge = keeper.get_current_badge()
-            expires_at = getattr(keeper, 'badge_expires_at', None)
+            # Get expiration from keeper if available, otherwise None
+            expires_at = None
+            if hasattr(keeper, 'badge_expires_at'):
+                expires_at = keeper.badge_expires_at
+            elif hasattr(keeper, 'get_badge_expiration'):
+                expires_at = keeper.get_badge_expiration()
             
             return badge, expires_at, keeper, guard
             

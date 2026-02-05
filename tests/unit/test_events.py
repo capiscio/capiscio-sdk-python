@@ -1,8 +1,6 @@
 """Unit tests for capiscio_sdk.events module."""
 
 import pytest
-import time
-from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 from capiscio_sdk.events import (
@@ -10,7 +8,6 @@ from capiscio_sdk.events import (
     init,
     emit,
     flush,
-    _global_emitter,
 )
 
 
