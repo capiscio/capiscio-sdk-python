@@ -185,36 +185,36 @@ class TestCapiscIOConnect:
 
     def test_connect_calls_connector(self):
         """Test that connect creates and runs _Connector."""
-        with patch("capiscio_sdk.connect._Connector") as MockConnector:
-            mock_instance = MagicMock()
-            mock_identity = AgentIdentity(
-                agent_id="test-123",
-                did="did:key:z6MkTest",
-                name="Test",
-                api_key="sk_test_abc",
-                server_url=PROD_REGISTRY,
-                keys_dir=Path("/tmp/keys"),
-            )
-            mock_instance.connect.return_value = mock_identity
-            MockConnector.return_value = mock_instance
-            
-            result = CapiscIO.connect(
-                api_key="sk_test_abc",
-                name="Test Agent",
-                server_url="https://custom.server.com",
-            )
-            
-            MockConnector.assert_called_once_with(
-                api_key="sk_test_abc",
-                name="Test Agent",
-                agent_id=None,
-                server_url="https://custom.server.com",
-                keys_dir=None,
-                auto_badge=True,
-                dev_mode=False,
-            )
-            mock_instance.connect.assert_called_once()
-            assert result == mock_identity
+        # Patch the _Connector class where it's defined in the module
+        with patch.object(_Connector, "__init__", return_value=None) as mock_init:
+            with patch.object(_Connector, "connect") as mock_connect:
+                mock_identity = AgentIdentity(
+                    agent_id="test-123",
+                    did="did:key:z6MkTest",
+                    name="Test",
+                    api_key="sk_test_abc",
+                    server_url=PROD_REGISTRY,
+                    keys_dir=Path("/tmp/keys"),
+                )
+                mock_connect.return_value = mock_identity
+                
+                result = CapiscIO.connect(
+                    api_key="sk_test_abc",
+                    name="Test Agent",
+                    server_url="https://custom.server.com",
+                )
+                
+                mock_init.assert_called_once_with(
+                    api_key="sk_test_abc",
+                    name="Test Agent",
+                    agent_id=None,
+                    server_url="https://custom.server.com",
+                    keys_dir=None,
+                    auto_badge=True,
+                    dev_mode=False,
+                )
+                mock_connect.assert_called_once()
+                assert result == mock_identity
 
 
 class TestCapiscIOFromEnv:
