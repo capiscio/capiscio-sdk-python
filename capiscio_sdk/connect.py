@@ -285,21 +285,24 @@ class _Connector:
     
     def _ensure_agent(self) -> Dict[str, Any]:
         """Find existing agent or create new one."""
-        if self.agent_id:
-            # Fetch specific agent
-            resp = self._client.get(f"/v1/agents/{self.agent_id}")
-            if resp.status_code == 200:
-                data = resp.json()
-                return data.get("data", data)
-            elif resp.status_code == 404:
-                raise ValueError(f"Agent {self.agent_id} not found")
-            else:
-                raise RuntimeError(f"Failed to fetch agent: {resp.text}")
-        
-        # List agents and find by name or use first one
-        resp = self._client.get("/v1/agents")
-        if resp.status_code != 200:
-            raise RuntimeError(f"Failed to list agents: {resp.text}")
+        try:
+            if self.agent_id:
+                # Fetch specific agent
+                resp = self._client.get(f"/v1/agents/{self.agent_id}")
+                if resp.status_code == 200:
+                    data = resp.json()
+                    return data.get("data", data)
+                elif resp.status_code == 404:
+                    raise ValueError(f"Agent {self.agent_id} not found")
+                else:
+                    raise RuntimeError(f"Failed to fetch agent (status {resp.status_code})")
+            
+            # List agents and find by name or use first one
+            resp = self._client.get("/v1/agents")
+            if resp.status_code != 200:
+                raise RuntimeError(f"Failed to list agents (status {resp.status_code})")
+        except httpx.RequestError as e:
+            raise RuntimeError(f"Network error connecting to server: {type(e).__name__}") from e
         
         data = resp.json()
         agents = data.get("data", data) if isinstance(data.get("data", data), list) else []
@@ -321,13 +324,16 @@ class _Connector:
         """Create a new agent."""
         name = self.name or f"Agent-{os.urandom(4).hex()}"
         
-        resp = self._client.post("/v1/agents", json={
-            "name": name,
-            "protocol": "a2a",
-        })
+        try:
+            resp = self._client.post("/v1/agents", json={
+                "name": name,
+                "protocol": "a2a",
+            })
+        except httpx.RequestError as e:
+            raise RuntimeError(f"Network error creating agent: {type(e).__name__}") from e
         
         if resp.status_code not in (200, 201):
-            raise RuntimeError(f"Failed to create agent: {resp.text}")
+            raise RuntimeError(f"Failed to create agent (status {resp.status_code})")
         
         data = resp.json()
         logger.info(f"Created new agent: {name}")
