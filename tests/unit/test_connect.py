@@ -2,6 +2,7 @@
 
 import os
 import pytest
+import httpx
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -566,6 +567,40 @@ class TestConnector:
         connector._client.post = MagicMock(return_value=mock_response)
         
         with pytest.raises(RuntimeError, match="Failed to create agent"):
+            connector._create_agent()
+
+    def test_ensure_agent_network_error(self):
+        """Test _ensure_agent handles network errors gracefully."""
+        connector = _Connector(
+            api_key="sk_test",
+            name=None,
+            agent_id="some-agent",
+            server_url="https://test.server.com",
+            keys_dir=None,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        connector._client.get = MagicMock(side_effect=httpx.ConnectError("Connection refused"))
+        
+        with pytest.raises(RuntimeError, match="Network error connecting to server"):
+            connector._ensure_agent()
+
+    def test_create_agent_network_error(self):
+        """Test _create_agent handles network errors gracefully."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id=None,
+            server_url="https://test.server.com",
+            keys_dir=None,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        connector._client.post = MagicMock(side_effect=httpx.TimeoutException("Timeout"))
+        
+        with pytest.raises(RuntimeError, match="Network error creating agent"):
             connector._create_agent()
 
     def test_connect_full_flow(self, tmp_path):
