@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-02-08
+
+### Added
+- **CapiscIO.connect()**: "Let's Encrypt" style one-liner agent setup
+  - Single API call handles key generation, DID creation, registration, and badge request
+  - Cryptographic operations performed by capiscio-core Go library via gRPC
+  - Context manager support for automatic resource cleanup
+- **CapiscIO.from_env()**: Initialize from `CAPISCIO_API_KEY` environment variable
+- **AgentIdentity**: Dataclass representing a fully-configured agent
+  - `emit()`: Send events to the registry
+  - `status()`: Get agent status including badge validity
+  - `close()`: Clean up resources (also works as context manager)
+- **EventEmitter**: Agent event emission with batching
+  - Thread-safe batch operations
+  - Automatic flush on batch size threshold
+  - Convenience methods: `task_started()`, `task_completed()`, `task_failed()`, `tool_call()`, `tool_result()`
+
+### Fixed
+- **httpx exception handling**: Network errors now raise `RuntimeError` with sanitized messages
+- **Error message sanitization**: Removed `resp.text` from error messages to prevent API key exposure
+
 ## [2.4.0] - 2026-01-18
 
 ### Fixed
