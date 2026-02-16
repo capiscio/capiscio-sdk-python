@@ -1,5 +1,5 @@
 """FastAPI integration for Capiscio SimpleGuard."""
-from typing import Callable, Awaitable, Any, Dict, List, Optional
+from typing import Callable, Awaitable, Any, Dict, List, Optional, TYPE_CHECKING
 try:
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.requests import Request
@@ -11,6 +11,12 @@ except ImportError:
 from ..simple_guard import SimpleGuard
 from ..errors import VerificationError
 import time
+import logging
+
+if TYPE_CHECKING:
+    from ..config import SecurityConfig
+
+logger = logging.getLogger(__name__)
 
 class CapiscioMiddleware(BaseHTTPMiddleware):
     """
@@ -19,17 +25,28 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
     Args:
         app: The ASGI application.
         guard: SimpleGuard instance for verification.
+        config: Optional SecurityConfig to control enforcement behavior.
         exclude_paths: List of paths to skip verification (e.g., ["/health", "/.well-known/agent-card.json"]).
+    
+    Security behavior controlled by SecurityConfig:
+        - config.downstream.require_signatures: If False, allow requests without badges
+        - config.fail_mode: "block" returns 401/403, "monitor" logs and allows, "log" just logs
     """
     def __init__(
         self, 
         app: ASGIApp, 
         guard: SimpleGuard, 
+        config: Optional["SecurityConfig"] = None,
         exclude_paths: Optional[List[str]] = None
     ) -> None:
         super().__init__(app)
         self.guard = guard
+        self.config = config
         self.exclude_paths = exclude_paths or []
+        
+        # Default to strict mode if no config
+        self.require_signatures = config.downstream.require_signatures if config else True
+        self.fail_mode = config.fail_mode if config else "block"
 
     async def dispatch(
         self, 
@@ -47,13 +64,30 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
         # RFC-002 §9.1: X-Capiscio-Badge header
         auth_header = request.headers.get("X-Capiscio-Badge")
         
-        # If no header, we might let it pass but mark as unverified?
-        # The mandate says: "Returns 401 (missing) or 403 (invalid)."
+        # Handle missing badge based on config
         if not auth_header:
-             return JSONResponse(
-                 {"error": "Missing X-Capiscio-Badge header. This endpoint is protected by CapiscIO."}, 
-                 status_code=401
-             )
+            if not self.require_signatures:
+                # No badge required - allow through but mark as unverified
+                request.state.agent = None
+                request.state.agent_id = None
+                return await call_next(request)
+            
+            # Badge required but missing
+            if self.fail_mode == "log":
+                logger.warning(f"Missing X-Capiscio-Badge header for {request.url.path} (log mode)")
+                request.state.agent = None
+                request.state.agent_id = None
+                return await call_next(request)
+            elif self.fail_mode == "monitor":
+                logger.warning(f"Missing X-Capiscio-Badge header for {request.url.path} (monitor mode)")
+                request.state.agent = None
+                request.state.agent_id = None
+                return await call_next(request)
+            else:  # block
+                return JSONResponse(
+                    {"error": "Missing X-Capiscio-Badge header. This endpoint is protected by CapiscIO."}, 
+                    status_code=401
+                )
 
         start_time = time.perf_counter()
         try:
@@ -73,7 +107,18 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
             request.state.agent_id = payload.get("iss")
             
         except VerificationError as e:
-            return JSONResponse({"error": f"Access Denied: {str(e)}"}, status_code=403)
+            if self.fail_mode == "log":
+                logger.warning(f"Badge verification failed: {e} (log mode)")
+                request.state.agent = None
+                request.state.agent_id = None
+                return await call_next(request)
+            elif self.fail_mode == "monitor":
+                logger.warning(f"Badge verification failed: {e} (monitor mode)")
+                request.state.agent = None
+                request.state.agent_id = None
+                return await call_next(request)
+            else:  # block
+                return JSONResponse({"error": f"Access Denied: {str(e)}"}, status_code=403)
         
         verification_duration = (time.perf_counter() - start_time) * 1000
 
