@@ -312,12 +312,14 @@ class _Connector:
             for agent in agents:
                 if agent.get("name") == self.name:
                     return agent
+            # Name specified but not found - create new agent with that name
+            return self._create_agent()
         
-        # Use first agent if available
+        # No name specified - use first agent if available
         if agents:
             return agents[0]
         
-        # Create new agent
+        # No agents exist - create new agent
         return self._create_agent()
     
     def _create_agent(self) -> Dict[str, Any]:
