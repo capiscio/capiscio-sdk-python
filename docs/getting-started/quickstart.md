@@ -33,12 +33,32 @@ from capiscio_sdk import CapiscIO
 agent = CapiscIO.from_env()
 ```
 
-### Two Setup Paths
+### Three Setup Paths
 
 | Path | When to Use | Code |
 |------|-------------|------|
 | **Quick Start** | Getting started, single agent | `CapiscIO.connect(api_key="...")` |
+| **Name-Based** | Named agents, easier lookups | `CapiscIO.connect(api_key="...", name="my-support-agent")` |
 | **UI-First** | Teams, multiple agents | `CapiscIO.connect(api_key="...", agent_id="agt_123")` |
+
+#### Name-Based Connect (New!)
+
+Use `name` to connect by agent name instead of ID. If the name doesn't exist, a new agent is created:
+
+```python
+from capiscio_sdk import CapiscIO
+
+# Connects to existing "my-agent" or creates it
+agent = CapiscIO.connect(api_key="sk_live_...", name="my-support-agent")
+
+print(agent.agent_id)  # Agent ID (created or found)
+print(agent.did)       # Agent DID
+```
+
+**Benefits:**
+- No need to store agent IDs in config
+- Idempotent - safe to call multiple times
+- Works with environment-based setups
 
 ---
 
