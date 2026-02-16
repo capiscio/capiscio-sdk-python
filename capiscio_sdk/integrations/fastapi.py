@@ -45,8 +45,8 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
         self.exclude_paths = exclude_paths or []
         
         # Default to strict mode if no config
-        self.require_signatures = config.downstream.require_signatures if config else True
-        self.fail_mode = config.fail_mode if config else "block"
+        self.require_signatures = config.downstream.require_signatures if config is not None else True
+        self.fail_mode = config.fail_mode if config is not None else "block"
 
     async def dispatch(
         self, 
@@ -73,13 +73,8 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
                 return await call_next(request)
             
             # Badge required but missing
-            if self.fail_mode == "log":
-                logger.warning(f"Missing X-Capiscio-Badge header for {request.url.path} (log mode)")
-                request.state.agent = None
-                request.state.agent_id = None
-                return await call_next(request)
-            elif self.fail_mode == "monitor":
-                logger.warning(f"Missing X-Capiscio-Badge header for {request.url.path} (monitor mode)")
+            if self.fail_mode in ("log", "monitor"):
+                logger.warning(f"Missing X-Capiscio-Badge header for {request.url.path} ({self.fail_mode} mode)")
                 request.state.agent = None
                 request.state.agent_id = None
                 return await call_next(request)
@@ -107,13 +102,8 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
             request.state.agent_id = payload.get("iss")
             
         except VerificationError as e:
-            if self.fail_mode == "log":
-                logger.warning(f"Badge verification failed: {e} (log mode)")
-                request.state.agent = None
-                request.state.agent_id = None
-                return await call_next(request)
-            elif self.fail_mode == "monitor":
-                logger.warning(f"Badge verification failed: {e} (monitor mode)")
+            if self.fail_mode in ("log", "monitor"):
+                logger.warning(f"Badge verification failed: {e} ({self.fail_mode} mode)")
                 request.state.agent = None
                 request.state.agent_id = None
                 return await call_next(request)
