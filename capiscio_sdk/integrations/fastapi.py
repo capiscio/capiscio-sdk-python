@@ -106,6 +106,10 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
                 logger.warning(f"Badge verification failed: {e} ({self.fail_mode} mode)")
                 request.state.agent = None
                 request.state.agent_id = None
+                # Reset receive so downstream can read body (body_bytes was consumed above)
+                async def receive() -> Dict[str, Any]:
+                    return {"type": "http.request", "body": body_bytes, "more_body": False}
+                request._receive = receive
                 return await call_next(request)
             else:  # block
                 return JSONResponse({"error": f"Access Denied: {str(e)}"}, status_code=403)

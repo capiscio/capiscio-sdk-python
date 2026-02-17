@@ -44,7 +44,7 @@ from capiscio_sdk.integrations.fastapi import CapiscioMiddleware
 config = SecurityConfig.from_env()
 
 # Or use presets
-config = SecurityConfig.production()  # Strict mode (block on failure)
+config = SecurityConfig.production()  # Balanced production defaults (block on verified failures)
 config = SecurityConfig.development() # Monitor mode (log but allow)
 
 app.add_middleware(CapiscioMiddleware, guard=guard, config=config)
@@ -54,10 +54,9 @@ app.add_middleware(CapiscioMiddleware, guard=guard, config=config)
 
 | Variable | Description | Default |
 |----------|-------------|--------|
-| `CAPISCIO_REQUIRE_SIGNATURES` | Require badge on requests | `true` |
+| `CAPISCIO_REQUIRE_SIGNATURES` | Require badge on requests | `false` |
 | `CAPISCIO_FAIL_MODE` | `block`, `monitor`, or `log` | `block` |
-| `CAPISCIO_MIN_TRUST_LEVEL` | Minimum trust level (0-4) | `0` |
-| `CAPISCIO_RATE_LIMIT_RPM` | Rate limit (requests/min) | `1000` |
+| `CAPISCIO_RATE_LIMIT_RPM` | Rate limit (requests/min) | `60` |
 
 ## 🛡️ What You Get (Out of the Box)
 
