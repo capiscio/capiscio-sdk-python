@@ -25,19 +25,22 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
     Args:
         app: The ASGI application.
         guard: SimpleGuard instance for verification.
-        config: Optional SecurityConfig to control enforcement behavior.
         exclude_paths: List of paths to skip verification (e.g., ["/health", "/.well-known/agent-card.json"]).
+        config: Optional SecurityConfig to control enforcement behavior.
     
-    Security behavior controlled by SecurityConfig:
-        - config.downstream.require_signatures: If False, allow requests without badges
-        - config.fail_mode: "block" returns 401/403, "monitor" logs and allows, "log" just logs
+    Security behavior:
+        - If config is None, defaults to strict blocking mode
+        - fail_mode takes precedence: "log"/"monitor" always allow through (regardless of require_signatures)
+        - When fail_mode="block" and require_signatures=False, missing badges are allowed
+        - When fail_mode="block" and require_signatures=True, badges are enforced
     """
     def __init__(
         self, 
         app: ASGIApp, 
         guard: SimpleGuard, 
-        config: Optional["SecurityConfig"] = None,
-        exclude_paths: Optional[List[str]] = None
+        exclude_paths: Optional[List[str]] = None,
+        *,  # Force config to be keyword-only
+        config: Optional["SecurityConfig"] = None
     ) -> None:
         super().__init__(app)
         self.guard = guard
