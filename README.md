@@ -32,6 +32,32 @@ async def handle_task(request: Request):
     return {"status": "accepted", "verified_caller": caller}
 ```
 
+### Configurable Security Modes
+
+Control enforcement behavior via environment variables:
+
+```python
+from capiscio_sdk.config import SecurityConfig
+from capiscio_sdk.integrations.fastapi import CapiscioMiddleware
+
+# Load config from environment variables
+config = SecurityConfig.from_env()
+
+# Or use presets
+config = SecurityConfig.production()  # Balanced production defaults (block on verified failures)
+config = SecurityConfig.development() # Monitor mode (log but allow)
+
+app.add_middleware(CapiscioMiddleware, guard=guard, config=config)
+```
+
+**Environment Variables:**
+
+| Variable | Description | Default |
+|----------|-------------|--------|
+| `CAPISCIO_REQUIRE_SIGNATURES` | Require badge on requests | `false` |
+| `CAPISCIO_FAIL_MODE` | `block`, `monitor`, or `log` | `block` |
+| `CAPISCIO_RATE_LIMIT_RPM` | Rate limit (requests/min) | `60` |
+
 ## 🛡️ What You Get (Out of the Box)
 
 1.  **Zero-Config Identity**:
@@ -55,6 +81,64 @@ async def handle_task(request: Request):
 ```bash
 pip install capiscio-sdk
 ```
+
+## 🔌 CapiscIO.connect() - "Let's Encrypt" Style Setup
+
+The fastest way to get a production-ready agent identity:
+
+```python
+from capiscio_sdk import CapiscIO
+
+# One-liner to get a fully configured agent
+agent = CapiscIO.connect(api_key="sk_live_...")
+
+# Agent is now ready
+print(agent.did)    # did:key:z6Mk...
+print(agent.badge)  # Current badge (auto-renewed)
+print(agent.name)   # Agent name
+```
+
+### Connect Parameters
+
+| Parameter | Description | Default |
+|-----------|-------------|---------|
+| `api_key` | Your CapiscIO API key | Required |
+| `name` | Agent name for lookup/creation | Auto-generated |
+| `agent_id` | Specific agent UUID | Auto-discovered |
+| `server_url` | Registry URL | `https://registry.capisc.io` |
+| `auto_badge` | Request badge automatically | `True` |
+| `dev_mode` | Use self-signed badges (Level 0) | `False` |
+
+### Name-Based Agent Lookup
+
+When you specify a `name`, the SDK will:
+1. Search for an existing agent with that name
+2. If not found, **create a new agent** with that name
+3. Return the agent identity
+
+```python
+# First run: creates "my-research-agent"
+agent = CapiscIO.connect(api_key="...", name="my-research-agent")
+
+# Second run: finds existing "my-research-agent"
+agent = CapiscIO.connect(api_key="...", name="my-research-agent")
+```
+
+### Using Environment Variables
+
+```python
+from capiscio_sdk import CapiscIO
+
+# Reads from CAPISCIO_API_KEY, CAPISCIO_AGENT_NAME, etc.
+agent = CapiscIO.from_env()
+```
+
+**Environment Variables:**
+- `CAPISCIO_API_KEY` (required) - Your API key
+- `CAPISCIO_AGENT_NAME` - Agent name for lookup/creation
+- `CAPISCIO_AGENT_ID` - Specific agent UUID
+- `CAPISCIO_SERVER_URL` - Registry URL
+- `CAPISCIO_DEV_MODE` - Enable dev mode (`true`/`false`)
 
 ## 🎯 Agent Card Validation with CoreValidator
 

@@ -575,6 +575,7 @@ Load configuration from environment variables using `SecurityConfig.from_env()`.
 | `CAPISCIO_VALIDATE_SCHEMA` | bool | `true` | Enable schema validation |
 | `CAPISCIO_VERIFY_SIGNATURES` | bool | `true` | Verify signatures if present |
 | `CAPISCIO_REQUIRE_SIGNATURES` | bool | `false` | Require all messages signed |
+| `CAPISCIO_MIN_TRUST_LEVEL` | int | `0` | Reserved for future use (not currently enforced) |
 | `CAPISCIO_RATE_LIMITING` | bool | `true` | Enable rate limiting |
 | `CAPISCIO_RATE_LIMIT_RPM` | int | `60` | Requests per minute limit |
 

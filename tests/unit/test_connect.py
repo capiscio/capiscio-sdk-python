@@ -526,6 +526,48 @@ class TestConnector:
         assert result == {"id": "new-id", "name": "New"}
         connector._client.post.assert_called_once()
 
+    def test_ensure_agent_creates_when_name_not_found(self):
+        """Test _ensure_agent creates agent when name specified but not found.
+        
+        This is the key "Let's Encrypt" behavior: if the user specifies a name
+        and no agent with that name exists, we create one with that name.
+        """
+        connector = _Connector(
+            api_key="sk_test",
+            name="my-new-agent",  # Specified name
+            agent_id=None,
+            server_url="https://test.server.com",
+            keys_dir=None,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        
+        # Agents exist but none match the specified name
+        list_response = MagicMock()
+        list_response.status_code = 200
+        list_response.json.return_value = {
+            "data": [
+                {"id": "agent-1", "name": "other-agent"},
+                {"id": "agent-2", "name": "another-agent"},
+            ]
+        }
+        
+        create_response = MagicMock()
+        create_response.status_code = 201
+        create_response.json.return_value = {"data": {"id": "new-id", "name": "my-new-agent"}}
+        
+        connector._client.get = MagicMock(return_value=list_response)
+        connector._client.post = MagicMock(return_value=create_response)
+        
+        result = connector._ensure_agent()
+        
+        # Should create new agent, NOT return agents[0]
+        assert result == {"id": "new-id", "name": "my-new-agent"}
+        connector._client.post.assert_called_once()
+        # Verify the name was passed to create
+        call_args = connector._client.post.call_args
+        assert call_args[1]["json"]["name"] == "my-new-agent"
+
     def test_create_agent_generates_name(self):
         """Test _create_agent generates name when not provided."""
         connector = _Connector(

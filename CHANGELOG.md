@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **httpx exception handling**: Network errors now raise `RuntimeError` with sanitized messages
 - **Error message sanitization**: Removed `resp.text` from error messages to prevent API key exposure
+- **Agent name lookup**: When `name` is specified but no agent matches, a new agent is now created (previously fell back to first existing agent)
 
 ## [2.4.0] - 2026-01-18
 
