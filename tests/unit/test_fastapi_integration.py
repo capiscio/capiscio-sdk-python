@@ -304,3 +304,124 @@ class TestSecurityConfigIntegration:
             assert config.downstream.require_signatures is True
             assert config.fail_mode == "monitor"
             assert config.downstream.rate_limit_requests_per_minute == 100
+
+    def test_middleware_options_bypass(self):
+        """Test that OPTIONS requests bypass verification (CORS preflight)."""
+        mock_guard = MagicMock()
+        mock_guard.agent_id = "test-agent"
+        
+        app = FastAPI()
+        app.add_middleware(
+            CapiscioMiddleware,
+            guard=mock_guard,
+        )
+        
+        @app.api_route("/test", methods=["OPTIONS", "POST"])
+        async def test_endpoint():
+            return {"ok": True}
+        
+        client = TestClient(app)
+        # OPTIONS should pass without header
+        response = client.options("/test")
+        assert response.status_code == 200
+        # verify_inbound should NOT have been called
+        mock_guard.verify_inbound.assert_not_called()
+    
+    def test_middleware_require_signatures_false(self):
+        """Test require_signatures=False allows requests without badge."""
+        mock_guard = MagicMock()
+        mock_guard.agent_id = "test-agent"
+        
+        config = SecurityConfig(
+            downstream=DownstreamConfig(require_signatures=False),  # No badge required
+            fail_mode="block",
+        )
+        
+        app = FastAPI()
+        app.add_middleware(
+            CapiscioMiddleware,
+            guard=mock_guard,
+            config=config,
+        )
+        
+        @app.post("/test")
+        async def test_endpoint(request: Request):
+            # Should have None for agent info
+            return {
+                "agent": getattr(request.state, 'agent', 'not-set'),
+                "agent_id": getattr(request.state, 'agent_id', 'not-set'),
+            }
+        
+        client = TestClient(app)
+        # Request WITHOUT badge header should pass
+        response = client.post("/test", json={})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["agent"] is None
+        assert data["agent_id"] is None
+        # verify_inbound should NOT have been called
+        mock_guard.verify_inbound.assert_not_called()
+    
+    def test_middleware_missing_badge_log_mode(self):
+        """Test missing badge with fail_mode='log' allows request through."""
+        mock_guard = MagicMock()
+        mock_guard.agent_id = "test-agent"
+        
+        config = SecurityConfig(
+            downstream=DownstreamConfig(require_signatures=True),  # Badge required
+            fail_mode="log",  # But just log failures
+        )
+        
+        app = FastAPI()
+        app.add_middleware(
+            CapiscioMiddleware,
+            guard=mock_guard,
+            config=config,
+        )
+        
+        @app.post("/test")
+        async def test_endpoint(request: Request):
+            return {
+                "agent": getattr(request.state, 'agent', 'not-set'),
+                "agent_id": getattr(request.state, 'agent_id', 'not-set'),
+            }
+        
+        client = TestClient(app)
+        # Request WITHOUT badge header - should pass in log mode
+        response = client.post("/test", json={})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["agent"] is None
+        assert data["agent_id"] is None
+    
+    def test_middleware_missing_badge_monitor_mode(self):
+        """Test missing badge with fail_mode='monitor' allows request through."""
+        mock_guard = MagicMock()
+        mock_guard.agent_id = "test-agent"
+        
+        config = SecurityConfig(
+            downstream=DownstreamConfig(require_signatures=True),  # Badge required
+            fail_mode="monitor",  # But just monitor failures
+        )
+        
+        app = FastAPI()
+        app.add_middleware(
+            CapiscioMiddleware,
+            guard=mock_guard,
+            config=config,
+        )
+        
+        @app.post("/test")
+        async def test_endpoint(request: Request):
+            return {
+                "agent": getattr(request.state, 'agent', 'not-set'),
+                "agent_id": getattr(request.state, 'agent_id', 'not-set'),
+            }
+        
+        client = TestClient(app)
+        # Request WITHOUT badge header - should pass in monitor mode
+        response = client.post("/test", json={})
+        assert response.status_code == 200
+        data = response.json()
+        assert data["agent"] is None
+        assert data["agent_id"] is None
