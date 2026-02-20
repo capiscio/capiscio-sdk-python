@@ -892,3 +892,219 @@ class TestDefaultPaths:
     def test_prod_registry(self):
         """Test PROD_REGISTRY constant."""
         assert PROD_REGISTRY == "https://registry.capisc.io"
+
+
+class TestEnsureDidRegistered:
+    """Tests for _ensure_did_registered method."""
+
+    def test_server_returns_error(self, tmp_path):
+        """Test _ensure_did_registered handles server error gracefully."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        mock_client = MagicMock()
+        mock_client.get.return_value = MagicMock(status_code=500)
+        connector._client = mock_client
+        
+        # Should not raise, just log warning
+        connector._ensure_did_registered("did:key:z6MkTest", {"kty": "OKP", "kid": "did:key:z6MkTest"})
+        
+        mock_client.get.assert_called_once_with("/v1/agents/agent-123")
+
+    def test_server_has_same_did(self, tmp_path):
+        """Test _ensure_did_registered when server already has the same DID."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        mock_client = MagicMock()
+        mock_resp = MagicMock(status_code=200)
+        mock_resp.json.return_value = {"data": {"did": "did:key:z6MkTest"}}
+        mock_client.get.return_value = mock_resp
+        connector._client = mock_client
+        
+        # Should return without calling PATCH
+        connector._ensure_did_registered("did:key:z6MkTest", {"kty": "OKP", "kid": "did:key:z6MkTest"})
+        
+        mock_client.get.assert_called_once()
+        mock_client.patch.assert_not_called()
+
+    def test_server_has_different_did(self, tmp_path):
+        """Test _ensure_did_registered when server has a different DID (e.g., did:web)."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        mock_client = MagicMock()
+        mock_resp = MagicMock(status_code=200)
+        mock_resp.json.return_value = {"data": {"did": "did:web:example.com:agent"}}
+        mock_client.get.return_value = mock_resp
+        connector._client = mock_client
+        
+        # Should return without calling PATCH (server's DID takes precedence)
+        connector._ensure_did_registered("did:key:z6MkTest", {"kty": "OKP", "kid": "did:key:z6MkTest"})
+        
+        mock_client.get.assert_called_once()
+        mock_client.patch.assert_not_called()
+
+    def test_server_has_no_did_registers(self, tmp_path):
+        """Test _ensure_did_registered registers DID when server has none."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        mock_client = MagicMock()
+        mock_get_resp = MagicMock(status_code=200)
+        mock_get_resp.json.return_value = {"data": {"did": None}}
+        mock_patch_resp = MagicMock(status_code=200)
+        mock_client.get.return_value = mock_get_resp
+        mock_client.patch.return_value = mock_patch_resp
+        connector._client = mock_client
+        
+        public_jwk = {"kty": "OKP", "crv": "Ed25519", "x": "abc123", "kid": "did:key:z6MkTest"}
+        connector._ensure_did_registered("did:key:z6MkTest", public_jwk)
+        
+        mock_client.get.assert_called_once()
+        mock_client.patch.assert_called_once()
+        # Verify PATCH was called with correct endpoint and payload
+        call_args = mock_client.patch.call_args
+        assert call_args[0][0] == "/v1/sdk/agents/agent-123/identity"
+
+    def test_server_patch_fails_logs_warning(self, tmp_path):
+        """Test _ensure_did_registered handles PATCH failure gracefully."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        mock_client = MagicMock()
+        mock_get_resp = MagicMock(status_code=200)
+        mock_get_resp.json.return_value = {"data": {"did": None}}
+        mock_patch_resp = MagicMock(status_code=500)
+        mock_client.get.return_value = mock_get_resp
+        mock_client.patch.return_value = mock_patch_resp
+        connector._client = mock_client
+        
+        # Should not raise, just log warning
+        connector._ensure_did_registered("did:key:z6MkTest", {"kty": "OKP", "kid": "did:key:z6MkTest"})
+
+
+class TestInitIdentityErrorPaths:
+    """Tests for _init_identity error recovery paths."""
+
+    def test_invalid_kid_regenerates(self, tmp_path):
+        """Test _init_identity regenerates when public.jwk has invalid kid."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        # Create keys with invalid kid (not a DID)
+        (tmp_path / "private.jwk").write_text('{"kty": "OKP", "d": "secret"}')
+        (tmp_path / "public.jwk").write_text('{"kty": "OKP", "kid": "not-a-did"}')
+        
+        mock_rpc = MagicMock()
+        mock_rpc.simpleguard.init.return_value = (
+            {"did": "did:key:z6MkNew", "registered": True},
+            None,
+        )
+        connector._rpc_client = mock_rpc
+        
+        result = connector._init_identity()
+        
+        # Should regenerate via RPC since kid is invalid
+        assert result == "did:key:z6MkNew"
+        mock_rpc.simpleguard.init.assert_called_once()
+
+    def test_json_decode_error_regenerates(self, tmp_path):
+        """Test _init_identity regenerates when public.jwk has invalid JSON."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        # Create keys with invalid JSON
+        (tmp_path / "private.jwk").write_text('{"kty": "OKP"}')
+        (tmp_path / "public.jwk").write_text('not valid json')
+        
+        mock_rpc = MagicMock()
+        mock_rpc.simpleguard.init.return_value = (
+            {"did": "did:key:z6MkNew", "registered": True},
+            None,
+        )
+        connector._rpc_client = mock_rpc
+        
+        result = connector._init_identity()
+        
+        # Should regenerate via RPC since JSON is invalid
+        assert result == "did:key:z6MkNew"
+        mock_rpc.simpleguard.init.assert_called_once()
+
+    def test_missing_kid_regenerates(self, tmp_path):
+        """Test _init_identity regenerates when public.jwk has no kid field."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        # Create keys without kid field
+        (tmp_path / "private.jwk").write_text('{"kty": "OKP", "d": "secret"}')
+        (tmp_path / "public.jwk").write_text('{"kty": "OKP", "crv": "Ed25519", "x": "abc123"}')
+        
+        mock_rpc = MagicMock()
+        mock_rpc.simpleguard.init.return_value = (
+            {"did": "did:key:z6MkNew", "registered": True},
+            None,
+        )
+        connector._rpc_client = mock_rpc
+        
+        result = connector._init_identity()
+        
+        # Should regenerate via RPC since kid is missing
+        assert result == "did:key:z6MkNew"
+        mock_rpc.simpleguard.init.assert_called_once()
