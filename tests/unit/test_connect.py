@@ -1111,3 +1111,191 @@ class TestInitIdentityErrorPaths:
         # Should regenerate via RPC since kid is missing
         assert result == "did:key:z6MkNew"
         mock_rpc.simpleguard.init.assert_called_once()
+
+
+class TestReadDidFromKeys:
+    """Tests for the _read_did_from_keys standalone helper function."""
+
+    def test_read_did_from_public_jwk_kid(self, tmp_path):
+        """Test reading DID from public.jwk kid field."""
+        from capiscio_sdk.connect import _read_did_from_keys
+        
+        # Create public.jwk with kid field
+        (tmp_path / "public.jwk").write_text(
+            '{"kty":"OKP","crv":"Ed25519","kid":"did:key:z6MkTestFromKid","x":"AAAA"}'
+        )
+        
+        result = _read_did_from_keys(tmp_path)
+        assert result == "did:key:z6MkTestFromKid"
+
+    def test_read_did_from_did_txt_fallback(self, tmp_path):
+        """Test reading DID from did.txt when public.jwk has no kid."""
+        from capiscio_sdk.connect import _read_did_from_keys
+        
+        # Create public.jwk without kid (legacy format)
+        (tmp_path / "public.jwk").write_text('{"kty":"OKP","crv":"Ed25519","x":"AAAA"}')
+        # Create did.txt as fallback
+        (tmp_path / "did.txt").write_text("did:key:z6MkFromDidTxt")
+        
+        result = _read_did_from_keys(tmp_path)
+        assert result == "did:key:z6MkFromDidTxt"
+
+    def test_read_did_malformed_json(self, tmp_path):
+        """Test handling of malformed JSON in public.jwk."""
+        from capiscio_sdk.connect import _read_did_from_keys
+        
+        (tmp_path / "public.jwk").write_text("not valid json")
+        (tmp_path / "did.txt").write_text("did:key:z6MkFallback")
+        
+        result = _read_did_from_keys(tmp_path)
+        assert result == "did:key:z6MkFallback"
+
+    def test_read_did_no_files_returns_none(self, tmp_path):
+        """Test returns None when no DID files exist."""
+        from capiscio_sdk.connect import _read_did_from_keys
+        
+        result = _read_did_from_keys(tmp_path)
+        assert result is None
+
+
+class TestFindAgentFromLocalKeys:
+    """Tests for _find_agent_from_local_keys method."""
+
+    def test_skips_non_uuid_directories(self, tmp_path):
+        """Test that non-UUID directories are skipped."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        # Create directory with non-UUID name
+        non_uuid_dir = tmp_path / "not-a-uuid"
+        non_uuid_dir.mkdir()
+        (non_uuid_dir / "private.jwk").write_text('{"kty":"OKP"}')
+        (non_uuid_dir / "public.jwk").write_text('{"kty":"OKP","kid":"did:key:z6MkTest"}')
+        
+        # Mock the HTTP client to track calls
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        connector._client = MagicMock()
+        connector._client.get = MagicMock(return_value=mock_response)
+        
+        result = connector._find_agent_from_local_keys()
+        
+        # Should not make API call for non-UUID directory
+        connector._client.get.assert_not_called()
+        assert result is None
+
+    def test_finds_agent_with_valid_uuid_keys(self, tmp_path):
+        """Test finding agent when valid UUID directory has keys."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        # Create directory with valid UUID name
+        agent_uuid = "12345678-1234-1234-1234-123456789012"
+        uuid_dir = tmp_path / agent_uuid
+        uuid_dir.mkdir()
+        (uuid_dir / "private.jwk").write_text('{"kty":"OKP"}')
+        (uuid_dir / "public.jwk").write_text('{"kty":"OKP","kid":"did:key:z6MkTest"}')
+        
+        # Mock the HTTP client
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": {"id": agent_uuid, "name": "Test"}}
+        connector._client = MagicMock()
+        connector._client.get = MagicMock(return_value=mock_response)
+        
+        result = connector._find_agent_from_local_keys()
+        
+        assert result is not None
+        assert result["id"] == agent_uuid
+
+
+class TestEnsureDidRegisteredMethod:
+    """Tests for _ensure_did_registered method."""
+
+    def test_returns_server_did_when_different(self, tmp_path):
+        """Test returns server DID when it differs from local."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        # Mock client to return agent with different DID
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": {"did": "did:web:example.com:agent"}}
+        connector._client = MagicMock()
+        connector._client.get = MagicMock(return_value=mock_response)
+        
+        result = connector._ensure_did_registered("did:key:z6MkLocal", {"kty": "OKP"})
+        
+        assert result == "did:web:example.com:agent"
+
+    def test_returns_none_when_did_matches(self, tmp_path):
+        """Test returns None when server DID matches local."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        # Mock client to return agent with matching DID
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {"data": {"did": "did:key:z6MkLocal"}}
+        connector._client = MagicMock()
+        connector._client.get = MagicMock(return_value=mock_response)
+        
+        result = connector._ensure_did_registered("did:key:z6MkLocal", {"kty": "OKP"})
+        
+        assert result is None
+
+    def test_registers_did_when_server_has_none(self, tmp_path):
+        """Test registers DID via PATCH when server has no DID."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        
+        # Mock responses: GET returns no DID, PATCH succeeds
+        mock_get = MagicMock()
+        mock_get.status_code = 200
+        mock_get.json.return_value = {"data": {"did": None}}
+        
+        mock_patch = MagicMock()
+        mock_patch.status_code = 200
+        
+        connector._client = MagicMock()
+        connector._client.get = MagicMock(return_value=mock_get)
+        connector._client.patch = MagicMock(return_value=mock_patch)
+        
+        result = connector._ensure_did_registered("did:key:z6MkNew", {"kty": "OKP"})
+        
+        # Should call PATCH to register
+        connector._client.patch.assert_called_once()
+        assert result is None  # No different DID to return
