@@ -674,8 +674,8 @@ class TestConnector:
         assert result.agent_id == "agent-123"
         assert result.did == "did:key:z6MkTest"
         assert result.name == "Test Agent"
-        # Keys are stored in subdirectory: {keys_dir}/{agent_id}/ for identity recovery
-        assert result.keys_dir == tmp_path / "keys" / "agent-123"
+        # User-provided keys_dir is preserved for backward compatibility
+        assert result.keys_dir == tmp_path / "keys"
         connector._ensure_agent.assert_called_once()
         connector._init_identity.assert_called_once()
 
@@ -772,8 +772,8 @@ class TestConnector:
         (tmp_path / "private.jwk").write_text('{"kty":"OKP","crv":"Ed25519"}')
         (tmp_path / "public.jwk").write_text('{"kty":"OKP","crv":"Ed25519","kid":"did:key:z6MkExisting"}')
         
-        # Mock _ensure_did_registered to avoid network calls
-        connector._ensure_did_registered = MagicMock()
+        # Mock _ensure_did_registered to return None (server DID matches local)
+        connector._ensure_did_registered = MagicMock(return_value=None)
         
         result = connector._init_identity()
         
@@ -1161,11 +1161,16 @@ class TestReadDidFromKeys:
 class TestFindAgentFromLocalKeys:
     """Tests for _find_agent_from_local_keys method."""
 
-    def test_skips_non_uuid_directories(self, tmp_path):
+    @patch('capiscio_sdk.connect.DEFAULT_KEYS_DIR')
+    def test_skips_non_uuid_directories(self, mock_default_dir, tmp_path):
         """Test that non-UUID directories are skipped."""
+        # Prevent scanning real ~/.capiscio/keys directory
+        mock_default_dir.exists.return_value = False
+        
         connector = _Connector(
             api_key="sk_test",
             name="Test",
+            agent_id=None,
             server_url="https://test.server.com",
             keys_dir=tmp_path,
             auto_badge=False,
@@ -1195,6 +1200,7 @@ class TestFindAgentFromLocalKeys:
         connector = _Connector(
             api_key="sk_test",
             name="Test",
+            agent_id=None,
             server_url="https://test.server.com",
             keys_dir=tmp_path,
             auto_badge=False,
