@@ -356,9 +356,10 @@ class _Connector:
             logger.info(f"Agent: {self.name} ({self.agent_id})")
             
             # Step 2: Set up keys directory
-            # Always create {keys_dir}/{agent_id}/ subdirectory for organization
-            base_keys_dir = self.keys_dir or DEFAULT_KEYS_DIR
-            self.keys_dir = base_keys_dir / self.agent_id
+            # For default keys_dir, use {DEFAULT_KEYS_DIR}/{agent_id}/ for multi-agent support.
+            # For user-provided keys_dir, preserve exact path for backward compatibility.
+            if self.keys_dir is None:
+                self.keys_dir = DEFAULT_KEYS_DIR / self.agent_id
             self.keys_dir.mkdir(parents=True, exist_ok=True)
             
             # Step 3: Initialize identity via capiscio-core Init RPC (one call does everything)
@@ -459,6 +460,9 @@ class _Connector:
         This prevents creating duplicate agents when the same machine reconnects.
         Keys define identity (per RFC-002 §6.1), not agent name - so we match by DID.
         """
+        import re
+        uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.I)
+        
         # Check user-provided keys_dir first, then default
         search_dirs = []
         if self.keys_dir and Path(self.keys_dir).exists():
@@ -482,8 +486,13 @@ class _Connector:
                     if not (private_key.exists() and public_key.exists()):
                         continue
                     
-                    # Found keys - verify agent exists on server
+                    # Found keys - verify agent_id looks like a UUID before API call
                     agent_id = subdir.name
+                    if not uuid_pattern.match(agent_id):
+                        logger.debug(f"Skipping non-UUID directory: {agent_id}")
+                        continue
+                    
+                    # Verify agent exists on server
                     try:
                         resp = self._client.get(f"/v1/agents/{agent_id}")
                         if resp.status_code == 200:
@@ -549,9 +558,10 @@ class _Connector:
                     logger.info(f"Recovered identity from existing keys: {did}")
                     
                     # Ensure DID is registered with server (may have failed previously)
-                    self._ensure_did_registered(did, public_jwk)
+                    # Server's DID is authoritative - may be did:web instead of did:key
+                    server_did = self._ensure_did_registered(did, public_jwk)
                     
-                    return did
+                    return server_did if server_did else did
                 else:
                     logger.warning("public.jwk exists but has no valid kid field - regenerating")
             except (json.JSONDecodeError, IOError) as e:
@@ -587,17 +597,20 @@ class _Connector:
         
         return did
     
-    def _ensure_did_registered(self, did: str, public_jwk: dict) -> None:
+    def _ensure_did_registered(self, did: str, public_jwk: dict) -> Optional[str]:
         """Ensure the DID is registered with the server.
         
         This handles the case where keys were generated but server registration failed.
+        
+        Returns:
+            Server's DID if different from local DID, None otherwise.
         """
         try:
             # Check if server already has a DID for this agent
             resp = self._client.get(f"/v1/agents/{self.agent_id}")
             if resp.status_code != 200:
                 logger.warning(f"Failed to check agent DID status: {resp.status_code}")
-                return
+                return None
             
             agent_data = resp.json().get("data", resp.json())
             server_did = agent_data.get("did")
@@ -605,8 +618,9 @@ class _Connector:
             if server_did:
                 # Server has a DID - could be did:web (production) or did:key
                 if server_did != did:
-                    logger.info(f"Server has different DID ({server_did}), using server's DID")
-                return
+                    logger.info(f"Server has different DID ({server_did}), using server's (authoritative)")
+                    return server_did  # Return server's DID so caller can use it
+                return None
             
             # Server has no DID - try to register using PATCH (partial update)
             logger.info("Registering DID with server...")
@@ -628,6 +642,8 @@ class _Connector:
         except Exception as e:
             # Don't fail connection just because registration failed
             logger.warning(f"DID registration check failed: {e} - continuing with local DID")
+        
+        return None
     
     def _setup_badge(self):
         """Set up BadgeKeeper for automatic badge management."""
