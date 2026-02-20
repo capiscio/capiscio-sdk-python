@@ -671,7 +671,8 @@ class TestConnector:
         assert result.agent_id == "agent-123"
         assert result.did == "did:key:z6MkTest"
         assert result.name == "Test Agent"
-        assert result.keys_dir == tmp_path / "keys"
+        # Keys are stored in subdirectory: {keys_dir}/{agent_id}/ for identity recovery
+        assert result.keys_dir == tmp_path / "keys" / "agent-123"
         connector._ensure_agent.assert_called_once()
         connector._init_identity.assert_called_once()
 
@@ -764,9 +765,12 @@ class TestConnector:
             dev_mode=False,
         )
         
-        # Create existing identity files
-        (tmp_path / "did.txt").write_text("did:key:z6MkExisting")
-        (tmp_path / "private.jwk").write_text('{"kty":"OKP"}')
+        # Create existing identity files (public.jwk has kid field with DID)
+        (tmp_path / "private.jwk").write_text('{"kty":"OKP","crv":"Ed25519"}')
+        (tmp_path / "public.jwk").write_text('{"kty":"OKP","crv":"Ed25519","kid":"did:key:z6MkExisting"}')
+        
+        # Mock _ensure_did_registered to avoid network calls
+        connector._ensure_did_registered = MagicMock()
         
         result = connector._init_identity()
         
