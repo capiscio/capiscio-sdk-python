@@ -109,20 +109,33 @@ print(agent.name)   # Agent name
 | `auto_badge` | Request badge automatically | `True` |
 | `dev_mode` | Use self-signed badges (Level 0) | `False` |
 
-### Name-Based Agent Lookup
+### Agent Discovery & Recovery
 
-When you specify a `name`, the SDK will:
-1. Search for an existing agent with that name
-2. If not found, **create a new agent** with that name
-3. Return the agent identity
+The SDK uses a smart discovery flow to find or create your agent:
+
+1. **Local keys check** - Scans `~/.capiscio/keys/*/` for any agent subdirectory with valid keys
+2. **DID-based verification** - Verifies local DID matches server's DID before reusing identity
+3. **Name-based lookup** - Falls back to searching by name if no local keys found
+4. **Auto-create** - Creates new agent if not found
 
 ```python
-# First run: creates "my-research-agent"
+# First run: creates "my-research-agent" + generates keys
 agent = CapiscIO.connect(api_key="...", name="my-research-agent")
 
-# Second run: finds existing "my-research-agent"
+# Second run: finds agent by existing keys (even if name changed in dashboard)
 agent = CapiscIO.connect(api_key="...", name="my-research-agent")
 ```
+
+**Key directory structure:**
+```
+~/.capiscio/keys/
+└── {agent-uuid}/
+    ├── private.jwk      # Ed25519 private key
+    ├── public.jwk       # Public key (contains DID in 'kid' field)
+    └── agent-card.json  # Agent metadata
+```
+
+**Recovery behavior:** If the SDK finds existing keys but the agent's DID isn't registered with the server, it will automatically complete registration. This handles crash recovery scenarios gracefully.
 
 ### Using Environment Variables
 

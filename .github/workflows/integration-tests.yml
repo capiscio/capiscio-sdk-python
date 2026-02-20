@@ -1,4 +1,4 @@
-name: Integration Tests
+name: SDK Server Contract Tests
 
 on:
   pull_request:
@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   integration-tests:
-    name: Integration Tests with Docker
+    name: SDK Server Contract Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     
@@ -98,16 +98,15 @@ jobs:
           
           echo "✓ Server is healthy"
       
-      - name: Run integration tests
+      - name: Run server contract integration tests
         working-directory: capiscio-sdk-python/tests/integration
         env:
           API_BASE_URL: http://server:8080
         run: |
-          docker compose run --rm test-runner pytest tests/integration/ \
-            --ignore=tests/integration/test_dv_badge_flow.py \
-            --ignore=tests/integration/test_dv_order_api.py \
-            --ignore=tests/integration/test_dv_sdk.py \
-            --ignore=tests/integration/test_mcp_service.py \
+          # Cross-product and server-dependent workflow coverage is owned by
+          # capiscio-e2e-tests. This workflow is intentionally narrow and
+          # validates the SDK's direct server contract surface only.
+          docker compose run --rm test-runner pytest tests/integration/test_server_integration.py \
             -v --tb=short --junit-xml=/workspace/test-results.xml
       
       - name: Upload test results
@@ -212,7 +211,7 @@ jobs:
         run: docker compose down -v
   
   summary:
-    name: Integration Tests Summary
+    name: Server Contract Test Summary
     needs: [integration-tests]
     runs-on: ubuntu-latest
     if: always()
@@ -221,10 +220,10 @@ jobs:
       - name: Check results
         run: |
           if [ "${{ needs.integration-tests.result }}" != "success" ]; then
-            echo "❌ Integration tests failed"
+            echo "❌ SDK server contract tests failed"
             exit 1
           fi
-          echo "✅ Integration tests passed!"
+          echo "✅ SDK server contract tests passed!"
       
       - name: Add PR comment
         if: github.event_name == 'pull_request' && needs.integration-tests.result == 'success'
@@ -235,5 +234,5 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '✅ Integration tests passed! Server validation, BadgeKeeper, and gRPC tests all working.'
+              body: '✅ SDK server contract tests passed (test_server_integration.py). Cross-product scenarios are validated in capiscio-e2e-tests.'
             })
