@@ -38,6 +38,120 @@ PROD_REGISTRY = "https://registry.capisc.io"
 PROD_DASHBOARD = "https://app.capisc.io"
 
 
+# =============================================================================
+# Standalone Helper Functions (for testing and direct use)
+# =============================================================================
+
+def _read_did_from_keys(identity_path: Path) -> Optional[str]:
+    """
+    Read DID from an identity directory.
+    
+    Tries did.txt first (legacy), falls back to public.jwk kid field.
+    Per RFC-002 §6.1, did:key is deterministically derived from the public key.
+    
+    Args:
+        identity_path: Path to identity directory containing key files
+        
+    Returns:
+        DID string or None if not recoverable
+    """
+    import json
+    
+    # Try did.txt first (legacy/explicit)
+    did_txt = identity_path / "did.txt"
+    if did_txt.exists():
+        did = did_txt.read_text().strip()
+        if did:
+            return did
+    
+    # Fall back to public.jwk kid field (RFC-002 §6.1)
+    public_jwk_path = identity_path / "public.jwk"
+    if public_jwk_path.exists():
+        try:
+            with open(public_jwk_path) as f:
+                public_jwk = json.load(f)
+                if "kid" in public_jwk:
+                    logger.debug(f"Recovered DID from public.jwk kid field")
+                    return public_jwk["kid"]
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to read public.jwk: {e}")
+    
+    return None
+
+
+def _find_agent_from_local_keys(keys_dir: Path, agent_id: str) -> Optional[str]:
+    """
+    Find agent identity by UUID in keys directory.
+    
+    Args:
+        keys_dir: Base keys directory (~/.capiscio/keys)
+        agent_id: Agent UUID to look for
+        
+    Returns:
+        DID string if found, None otherwise
+    """
+    identity_path = keys_dir / agent_id
+    if not identity_path.exists():
+        return None
+    
+    # Check if keys exist
+    if not (identity_path / "private.jwk").exists():
+        return None
+    
+    return _read_did_from_keys(identity_path)
+
+
+def _ensure_did_registered(
+    server_url: str,
+    api_key: str,
+    agent_id: str,
+    did: str,
+    public_key_jwk: Optional[str] = None,
+) -> bool:
+    """
+    Ensure DID is registered with the server.
+    
+    Uses PATCH /v1/sdk/agents/{id}/identity endpoint.
+    Handles 409 Conflict as success (identity already registered).
+    
+    Args:
+        server_url: Registry server URL
+        api_key: API key for authentication
+        agent_id: Agent UUID
+        did: DID to register
+        public_key_jwk: Optional public key JWK string
+        
+    Returns:
+        True if registered (or already exists), False on error
+    """
+    url = f"{server_url}/v1/sdk/agents/{agent_id}/identity"
+    headers = {
+        "X-Capiscio-Registry-Key": api_key,
+        "Content-Type": "application/json",
+    }
+    payload = {"did": did}
+    if public_key_jwk:
+        payload["publicKey"] = public_key_jwk
+    
+    try:
+        resp = httpx.patch(url, headers=headers, json=payload, timeout=30.0)
+        
+        if resp.status_code == 200:
+            logger.debug(f"DID registered successfully: {did}")
+            return True
+        elif resp.status_code == 409:
+            # Identity already exists - this is fine for recovery
+            logger.debug(f"DID already registered (409 Conflict): {did}")
+            return True
+        else:
+            logger.warning(f"DID registration failed: {resp.status_code} - {resp.text}")
+            return False
+            
+    except httpx.RequestError as e:
+        logger.warning(f"DID registration request failed: {e}")
+        return False
+
+
 @dataclass
 class AgentIdentity:
     """Represents a fully-configured agent identity."""
@@ -243,11 +357,13 @@ class _Connector:
             logger.info(f"Agent: {self.name} ({self.agent_id})")
             
             # Step 2: Set up keys directory
-            if not self.keys_dir:
-                self.keys_dir = DEFAULT_KEYS_DIR / self.agent_id
+            # Always create {keys_dir}/{agent_id}/ subdirectory for organization
+            base_keys_dir = self.keys_dir or DEFAULT_KEYS_DIR
+            self.keys_dir = base_keys_dir / self.agent_id
             self.keys_dir.mkdir(parents=True, exist_ok=True)
             
             # Step 3: Initialize identity via capiscio-core Init RPC (one call does everything)
+            # If keys already exist locally, we recover the DID without calling core.
             did = self._init_identity()
             logger.info(f"DID: {did}")
             
@@ -284,7 +400,17 @@ class _Connector:
             self._client.close()
     
     def _ensure_agent(self) -> Dict[str, Any]:
-        """Find existing agent or create new one."""
+        """Find existing agent or create new one.
+        
+        Priority order:
+        1. If agent_id is provided explicitly, use that
+        2. If local keys exist, use that agent (prevents duplicates)
+        3. Search by name on server
+        4. Use first available agent
+        5. Create new agent
+        
+        This prevents accidentally creating duplicate agents when names change.
+        """
         try:
             if self.agent_id:
                 # Fetch specific agent
@@ -296,6 +422,12 @@ class _Connector:
                     raise ValueError(f"Agent {self.agent_id} not found")
                 else:
                     raise RuntimeError(f"Failed to fetch agent (status {resp.status_code})")
+            
+            # Check for local keys directory - if we have keys, use that agent
+            local_agent = self._find_agent_from_local_keys()
+            if local_agent:
+                logger.debug(f"Found local identity for agent {local_agent['id']}")
+                return local_agent
             
             # List agents and find by name or use first one
             resp = self._client.get("/v1/agents")
@@ -321,6 +453,51 @@ class _Connector:
         
         # No agents exist - create new agent
         return self._create_agent()
+    
+    def _find_agent_from_local_keys(self) -> Optional[Dict[str, Any]]:
+        """Check if we have local keys for any agent and verify it exists on server.
+        
+        This prevents creating duplicate agents when the same machine reconnects.
+        Keys define identity (per RFC-002 §6.1), not agent name - so we match by DID.
+        """
+        # Check user-provided keys_dir first, then default
+        search_dirs = []
+        if self.keys_dir and Path(self.keys_dir).exists():
+            search_dirs.append(Path(self.keys_dir))
+        if DEFAULT_KEYS_DIR.exists():
+            search_dirs.append(DEFAULT_KEYS_DIR)
+        
+        if not search_dirs:
+            return None
+        
+        # Scan keys directories for agent subdirs with valid keys
+        try:
+            for keys_base in search_dirs:
+                for subdir in keys_base.iterdir():
+                    if not subdir.is_dir():
+                        continue
+                    
+                    private_key = subdir / "private.jwk"
+                    public_key = subdir / "public.jwk"
+                    
+                    if not (private_key.exists() and public_key.exists()):
+                        continue
+                    
+                    # Found keys - verify agent exists on server
+                    agent_id = subdir.name
+                    try:
+                        resp = self._client.get(f"/v1/agents/{agent_id}")
+                        if resp.status_code == 200:
+                            agent_data = resp.json().get("data", resp.json())
+                            # Keys define identity (DID), not name. Name is mutable metadata.
+                            # If we have keys for this agent, use it regardless of name.
+                            return agent_data
+                    except Exception:
+                        continue  # Agent doesn't exist or network error
+        except Exception:
+            pass  # Can't scan directory, continue with normal flow
+        
+        return None
     
     def _create_agent(self) -> Dict[str, Any]:
         """Create a new agent."""
@@ -351,15 +528,38 @@ class _Connector:
         4. Creates agent-card.json
         
         All cryptographic operations are performed by capiscio-core Go library.
+        
+        Identity Recovery:
+        - If keys exist locally (private.jwk + public.jwk), we derive the DID
+          from public.jwk's `kid` field (per RFC-002 §6.1: did:key is self-describing)
+        - No did.txt file is required - it's redundant
+        - If server has a did:web assigned, we use that instead
         """
-        did_file_path = self.keys_dir / "did.txt"
         private_key_path = self.keys_dir / "private.jwk"
+        public_key_path = self.keys_dir / "public.jwk"
         
-        # Check if we already have a DID and keys (for idempotency)
-        if did_file_path.exists() and private_key_path.exists():
-            logger.debug("Using existing identity from prior init")
-            return did_file_path.read_text().strip()
+        # Check if we already have keys (for idempotency)
+        if private_key_path.exists() and public_key_path.exists():
+            logger.debug("Found existing keys - recovering identity")
+            
+            # Derive DID from public key's kid field (RFC-002 §6.1: did:key is self-describing)
+            import json
+            try:
+                public_jwk = json.loads(public_key_path.read_text())
+                did = public_jwk.get("kid")
+                if did and did.startswith("did:"):
+                    logger.info(f"Recovered identity from existing keys: {did}")
+                    
+                    # Ensure DID is registered with server (may have failed previously)
+                    self._ensure_did_registered(did, public_jwk)
+                    
+                    return did
+                else:
+                    logger.warning("public.jwk exists but has no valid kid field - regenerating")
+            except (json.JSONDecodeError, IOError) as e:
+                logger.warning(f"Failed to read public.jwk: {e} - regenerating")
         
+        # No valid keys exist - generate new identity via Init RPC
         # Connect to capiscio-core gRPC
         if not self._rpc_client:
             self._rpc_client = CapiscioRPCClient()
@@ -383,14 +583,54 @@ class _Connector:
         
         did = result["did"]
         
-        # Save DID for future reference (idempotency check)
-        did_file_path.write_text(did)
-        
         logger.info(f"Identity initialized: {did}")
         if result.get("registered"):
             logger.info("DID registered with server")
         
         return did
+    
+    def _ensure_did_registered(self, did: str, public_jwk: dict) -> None:
+        """Ensure the DID is registered with the server.
+        
+        This handles the case where keys were generated but server registration failed.
+        """
+        try:
+            # Check if server already has a DID for this agent
+            resp = self._client.get(f"/v1/agents/{self.agent_id}")
+            if resp.status_code != 200:
+                logger.warning(f"Failed to check agent DID status: {resp.status_code}")
+                return
+            
+            agent_data = resp.json().get("data", resp.json())
+            server_did = agent_data.get("did")
+            
+            if server_did:
+                # Server has a DID - could be did:web (production) or did:key
+                if server_did != did:
+                    logger.info(f"Server has different DID ({server_did}), using server's DID")
+                return
+            
+            # Server has no DID - try to register using PATCH (partial update)
+            logger.info("Registering DID with server...")
+            
+            import json
+            resp = self._client.patch(
+                f"/v1/sdk/agents/{self.agent_id}/identity",
+                json={"did": did, "publicKey": json.dumps(public_jwk)},
+            )
+            
+            if resp.status_code == 200:
+                logger.info("DID registered with server")
+            elif resp.status_code == 409:
+                # Identity already exists (RFC-003 §9.5 immutability) - this is expected
+                logger.debug("Identity already registered (immutable per RFC-003)")
+            else:
+                # Endpoint may not exist or may have issues - log but continue
+                logger.warning(f"DID registration returned {resp.status_code} - continuing with local DID")
+                
+        except Exception as e:
+            # Don't fail connection just because registration failed
+            logger.warning(f"DID registration check failed: {e} - continuing with local DID")
     
     def _setup_badge(self):
         """Set up BadgeKeeper for automatic badge management."""

@@ -50,6 +50,8 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
         # Default to strict mode if no config
         self.require_signatures = config.downstream.require_signatures if config is not None else True
         self.fail_mode = config.fail_mode if config is not None else "block"
+        
+        logger.info(f"CapiscioMiddleware initialized: exclude_paths={self.exclude_paths}, require_signatures={self.require_signatures}, fail_mode={self.fail_mode}")
 
     async def dispatch(
         self, 
@@ -61,7 +63,10 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         
         # Skip verification for excluded paths
-        if request.url.path in self.exclude_paths:
+        path = request.url.path
+        logger.info(f"CapiscioMiddleware: path={path!r}, exclude_paths={self.exclude_paths}, match={path in self.exclude_paths}")
+        if path in self.exclude_paths:
+            logger.info(f"CapiscioMiddleware: SKIPPING verification for {path}")
             return await call_next(request)
 
         # RFC-002 §9.1: X-Capiscio-Badge header
