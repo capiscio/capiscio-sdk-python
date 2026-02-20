@@ -47,8 +47,8 @@ def _read_did_from_keys(identity_path: Path) -> Optional[str]:
     """
     Read DID from an identity directory.
     
-    Tries did.txt first (legacy), falls back to public.jwk kid field.
-    Per RFC-002 §6.1, did:key is deterministically derived from the public key.
+    Per RFC-002 §6.1, did:key is deterministically derived from the public key,
+    so public.jwk kid field is authoritative. Falls back to did.txt for legacy.
     
     Args:
         identity_path: Path to identity directory containing key files
@@ -56,14 +56,7 @@ def _read_did_from_keys(identity_path: Path) -> Optional[str]:
     Returns:
         DID string or None if not recoverable
     """
-    # Try did.txt first (legacy/explicit)
-    did_txt = identity_path / "did.txt"
-    if did_txt.exists():
-        did = did_txt.read_text().strip()
-        if did:
-            return did
-    
-    # Fall back to public.jwk kid field (RFC-002 §6.1)
+    # Primary: public.jwk kid field (RFC-002 §6.1 - authoritative source)
     public_jwk_path = identity_path / "public.jwk"
     if public_jwk_path.exists():
         try:
@@ -75,29 +68,15 @@ def _read_did_from_keys(identity_path: Path) -> Optional[str]:
         except (json.JSONDecodeError, IOError) as e:
             logger.warning(f"Failed to read public.jwk: {e}")
     
+    # Fallback: did.txt (legacy/explicit override)
+    did_txt = identity_path / "did.txt"
+    if did_txt.exists():
+        did = did_txt.read_text().strip()
+        if did:
+            logger.debug("Recovered DID from did.txt (legacy)")
+            return did
+    
     return None
-
-
-def _find_agent_from_local_keys(keys_dir: Path, agent_id: str) -> Optional[str]:
-    """
-    Find agent identity by UUID in keys directory.
-    
-    Args:
-        keys_dir: Base keys directory (~/.capiscio/keys)
-        agent_id: Agent UUID to look for
-        
-    Returns:
-        DID string if found, None otherwise
-    """
-    identity_path = keys_dir / agent_id
-    if not identity_path.exists():
-        return None
-    
-    # Check if keys exist
-    if not (identity_path / "private.jwk").exists():
-        return None
-    
-    return _read_did_from_keys(identity_path)
 
 
 def _ensure_did_registered(
@@ -458,7 +437,8 @@ class _Connector:
         """Check if we have local keys for any agent and verify it exists on server.
         
         This prevents creating duplicate agents when the same machine reconnects.
-        Keys define identity (per RFC-002 §6.1), not agent name - so we match by DID.
+        Keys define identity - we match by finding agent_id subdirectories with valid keys
+        and verifying the agent exists on the server with matching DID.
         """
         import re
         uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.I)
@@ -466,7 +446,28 @@ class _Connector:
         # Check user-provided keys_dir first, then default
         search_dirs = []
         if self.keys_dir and Path(self.keys_dir).exists():
-            search_dirs.append(Path(self.keys_dir))
+            user_keys_dir = Path(self.keys_dir)
+            search_dirs.append(user_keys_dir)
+            
+            # Backward compat: check if user provided flat keys_dir (keys directly in dir)
+            if (user_keys_dir / "private.jwk").exists() and (user_keys_dir / "public.jwk").exists():
+                # Flat structure - check if parent dir name is UUID
+                if uuid_pattern.match(user_keys_dir.name):
+                    local_did = _read_did_from_keys(user_keys_dir)
+                    if local_did:
+                        agent_id = user_keys_dir.name
+                        try:
+                            resp = self._client.get(f"/v1/agents/{agent_id}")
+                            if resp.status_code == 200:
+                                agent_data = resp.json().get("data", resp.json())
+                                server_did = agent_data.get("did")
+                                # Verify DID matches if server has one
+                                if not server_did or server_did == local_did:
+                                    return agent_data
+                                logger.debug(f"DID mismatch: local={local_did}, server={server_did}")
+                        except Exception:
+                            pass
+                            
         if DEFAULT_KEYS_DIR.exists():
             search_dirs.append(DEFAULT_KEYS_DIR)
         
@@ -492,13 +493,21 @@ class _Connector:
                         logger.debug(f"Skipping non-UUID directory: {agent_id}")
                         continue
                     
-                    # Verify agent exists on server
+                    # Read local DID for verification
+                    local_did = _read_did_from_keys(subdir)
+                    
+                    # Verify agent exists on server with matching DID
                     try:
                         resp = self._client.get(f"/v1/agents/{agent_id}")
                         if resp.status_code == 200:
                             agent_data = resp.json().get("data", resp.json())
-                            # Keys define identity (DID), not name. Name is mutable metadata.
-                            # If we have keys for this agent, use it regardless of name.
+                            server_did = agent_data.get("did")
+                            
+                            # If server has DID, verify it matches local keys
+                            if server_did and local_did and server_did != local_did:
+                                logger.warning(f"DID mismatch for {agent_id}: local={local_did}, server={server_did}")
+                                continue  # Don't use mismatched agent
+                            
                             return agent_data
                     except Exception:
                         continue  # Agent doesn't exist or network error
@@ -627,7 +636,7 @@ class _Connector:
             
             resp = self._client.patch(
                 f"/v1/sdk/agents/{self.agent_id}/identity",
-                json={"did": did, "publicKey": json.dumps(public_jwk)},
+                json={"did": did, "publicKey": public_jwk},
             )
             
             if resp.status_code == 200:

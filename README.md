@@ -113,9 +113,9 @@ print(agent.name)   # Agent name
 
 The SDK uses a smart discovery flow to find or create your agent:
 
-1. **Local keys check** - If keys exist at `~/.capiscio/keys/{agent_id}/`, the SDK reuses that identity
-2. **DID-based lookup** - Matches agent by DID (derived from public key), not name
-3. **Name-based lookup** - Falls back to searching by name if no local keys
+1. **Local keys check** - Scans `~/.capiscio/keys/*/` for any agent subdirectory with valid keys
+2. **DID-based verification** - Verifies local DID matches server's DID before reusing identity
+3. **Name-based lookup** - Falls back to searching by name if no local keys found
 4. **Auto-create** - Creates new agent if not found
 
 ```python
