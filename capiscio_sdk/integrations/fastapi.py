@@ -64,9 +64,9 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
         
         # Skip verification for excluded paths
         path = request.url.path
-        logger.info(f"CapiscioMiddleware: path={path!r}, exclude_paths={self.exclude_paths}, match={path in self.exclude_paths}")
+        logger.debug(f"CapiscioMiddleware: path={path!r}, exclude_paths={self.exclude_paths}, match={path in self.exclude_paths}")
         if path in self.exclude_paths:
-            logger.info(f"CapiscioMiddleware: SKIPPING verification for {path}")
+            logger.debug(f"CapiscioMiddleware: SKIPPING verification for {path}")
             return await call_next(request)
 
         # RFC-002 §9.1: X-Capiscio-Badge header

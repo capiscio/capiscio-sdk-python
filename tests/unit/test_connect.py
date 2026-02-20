@@ -401,6 +401,7 @@ class TestConnector:
             ]
         }
         connector._client.get = MagicMock(return_value=mock_response)
+        connector._find_agent_from_local_keys = MagicMock(return_value=None)
         
         result = connector._ensure_agent()
         
@@ -427,6 +428,7 @@ class TestConnector:
             ]
         }
         connector._client.get = MagicMock(return_value=mock_response)
+        connector._find_agent_from_local_keys = MagicMock(return_value=None)
         
         result = connector._ensure_agent()
         
@@ -558,6 +560,7 @@ class TestConnector:
         
         connector._client.get = MagicMock(return_value=list_response)
         connector._client.post = MagicMock(return_value=create_response)
+        connector._find_agent_from_local_keys = MagicMock(return_value=None)
         
         result = connector._ensure_agent()
         

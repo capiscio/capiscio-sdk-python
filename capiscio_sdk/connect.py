@@ -16,6 +16,7 @@ Usage:
     agent.emit("task_started", {"task_id": "123"})
 """
 
+import json
 import os
 import logging
 import httpx
@@ -55,8 +56,6 @@ def _read_did_from_keys(identity_path: Path) -> Optional[str]:
     Returns:
         DID string or None if not recoverable
     """
-    import json
-    
     # Try did.txt first (legacy/explicit)
     did_txt = identity_path / "did.txt"
     if did_txt.exists():
@@ -71,7 +70,7 @@ def _read_did_from_keys(identity_path: Path) -> Optional[str]:
             with open(public_jwk_path) as f:
                 public_jwk = json.load(f)
                 if "kid" in public_jwk:
-                    logger.debug(f"Recovered DID from public.jwk kid field")
+                    logger.debug("Recovered DID from public.jwk kid field")
                     return public_jwk["kid"]
         except (json.JSONDecodeError, IOError) as e:
             logger.warning(f"Failed to read public.jwk: {e}")
@@ -106,7 +105,7 @@ def _ensure_did_registered(
     api_key: str,
     agent_id: str,
     did: str,
-    public_key_jwk: Optional[str] = None,
+    public_key_jwk: Optional[dict] = None,
 ) -> bool:
     """
     Ensure DID is registered with the server.
@@ -119,7 +118,7 @@ def _ensure_did_registered(
         api_key: API key for authentication
         agent_id: Agent UUID
         did: DID to register
-        public_key_jwk: Optional public key JWK string
+        public_key_jwk: Optional public key JWK dict (Ed25519 format)
         
     Returns:
         True if registered (or already exists), False on error
@@ -543,7 +542,6 @@ class _Connector:
             logger.debug("Found existing keys - recovering identity")
             
             # Derive DID from public key's kid field (RFC-002 §6.1: did:key is self-describing)
-            import json
             try:
                 public_jwk = json.loads(public_key_path.read_text())
                 did = public_jwk.get("kid")
@@ -613,7 +611,6 @@ class _Connector:
             # Server has no DID - try to register using PATCH (partial update)
             logger.info("Registering DID with server...")
             
-            import json
             resp = self._client.patch(
                 f"/v1/sdk/agents/{self.agent_id}/identity",
                 json={"did": did, "publicKey": json.dumps(public_jwk)},

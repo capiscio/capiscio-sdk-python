@@ -2,6 +2,12 @@
 
 This directory contains integration tests that verify capiscio-sdk-python functionality against a live capiscio-server instance.
 
+## Scope Ownership
+
+- `capiscio-sdk-python` integration CI is intentionally narrow and focuses on SDK-to-server contract behavior.
+- Cross-product workflows and server-dependent end-to-end scenarios are owned by `capiscio-e2e-tests`.
+- This split avoids duplicated orchestration and keeps ownership explicit.
+
 ## Test Types
 
 ### 1. `test_real_executor.py` (Existing)
@@ -108,7 +114,7 @@ In GitHub Actions:
 - name: Run SDK integration tests
   run: |
     cd capiscio-sdk-python/tests/integration
-    docker-compose up --build --abort-on-container-exit --exit-code-from test-runner
+    docker-compose run --rm test-runner pytest tests/integration/test_server_integration.py -v
 ```
 
 ## Troubleshooting

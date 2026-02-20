@@ -53,13 +53,12 @@ jobs:
         run: |
           pytest tests/unit/ -v --tb=short --cov=capiscio_sdk --cov-report=xml --cov-report=term --cov-fail-under=70
       
-      # Integration tests require a running capiscio-server
-      # They run in capiscio-e2e-tests repo with full infrastructure
-      - name: Run integration tests (server-independent only)
+      # Server-dependent integration/E2E coverage is owned by capiscio-e2e-tests.
+      # This job keeps fast contract coverage for SDK-only integration behavior.
+      - name: Run integration contract tests (server-independent)
         run: |
           # Only run tests that don't require server connection
           pytest tests/integration/ -v --tb=short -k "not server" --ignore=tests/integration/test_server_integration.py --ignore=tests/integration/test_dv_badge_flow.py --ignore=tests/integration/test_dv_order_api.py
-        continue-on-error: true
       
       - name: Upload coverage to Codecov
         if: matrix.python-version == '3.11'
