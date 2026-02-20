@@ -774,8 +774,6 @@ class TestConnector:
 
     def test_init_identity_calls_rpc(self, tmp_path):
         """Test _init_identity calls capiscio-core RPC."""
-        from capiscio_sdk.connect import ConfigurationError
-        
         connector = _Connector(
             api_key="sk_test",
             name="Test",
@@ -808,8 +806,6 @@ class TestConnector:
 
     def test_init_identity_rpc_error(self, tmp_path):
         """Test _init_identity raises on RPC error."""
-        from capiscio_sdk.connect import ConfigurationError
-        
         connector = _Connector(
             api_key="sk_test",
             name="Test",

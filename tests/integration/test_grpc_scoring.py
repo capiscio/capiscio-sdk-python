@@ -69,12 +69,6 @@ class TestGRPCScoringService:
         """Test: gRPC client cleans up resources."""
         from capiscio_sdk._rpc.client import CapiscioRPCClient
         
-        client = CapiscioRPCClient(address=GRPC_ADDRESS)
-        client.connect()
-    def test_grpc_client_cleanup(self, server_health_check):
-        """Test: gRPC client cleans up resources."""
-        from capiscio_sdk._rpc.client import CapiscioRPCClient
-        
         try:
             client = CapiscioRPCClient(address=GRPC_ADDRESS)
             client.connect()
