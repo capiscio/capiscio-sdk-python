@@ -10,6 +10,7 @@ except ImportError:
 
 from ..simple_guard import SimpleGuard
 from ..errors import VerificationError
+from ..events import EventEmitter
 import time
 import logging
 
@@ -27,6 +28,9 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
         guard: SimpleGuard instance for verification.
         exclude_paths: List of paths to skip verification (e.g., ["/health", "/.well-known/agent-card.json"]).
         config: Optional SecurityConfig to control enforcement behavior.
+        emitter: Optional EventEmitter for auto-event emission. When provided,
+            the middleware automatically emits request.received, request.completed,
+            verification.success, and verification.failed events.
     
     Security behavior:
         - If config is None, defaults to strict blocking mode
@@ -40,18 +44,20 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
         guard: SimpleGuard, 
         exclude_paths: Optional[List[str]] = None,
         *,  # Force config to be keyword-only
-        config: Optional["SecurityConfig"] = None
+        config: Optional["SecurityConfig"] = None,
+        emitter: Optional[EventEmitter] = None,
     ) -> None:
         super().__init__(app)
         self.guard = guard
         self.config = config
         self.exclude_paths = exclude_paths or []
+        self._emitter = emitter
         
         # Default to strict mode if no config
         self.require_signatures = config.downstream.require_signatures if config is not None else True
         self.fail_mode = config.fail_mode if config is not None else "block"
         
-        logger.info(f"CapiscioMiddleware initialized: exclude_paths={self.exclude_paths}, require_signatures={self.require_signatures}, fail_mode={self.fail_mode}")
+        logger.info(f"CapiscioMiddleware initialized: exclude_paths={self.exclude_paths}, require_signatures={self.require_signatures}, fail_mode={self.fail_mode}, auto_events={emitter is not None}")
 
     async def dispatch(
         self, 
@@ -69,6 +75,14 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
             logger.debug(f"CapiscioMiddleware: SKIPPING verification for {path}")
             return await call_next(request)
 
+        request_start = time.perf_counter()
+
+        # Auto-event: request.received
+        self._auto_emit(EventEmitter.EVENT_REQUEST_RECEIVED, {
+            "method": request.method,
+            "path": path,
+        })
+
         # RFC-002 §9.1: X-Capiscio-Badge header
         auth_header = request.headers.get("X-Capiscio-Badge")
         
@@ -78,21 +92,30 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
                 # No badge required - allow through but mark as unverified
                 request.state.agent = None
                 request.state.agent_id = None
-                return await call_next(request)
+                response = await call_next(request)
+                self._auto_emit_completed(request, response, request_start)
+                return response
             
             # Badge required but missing
             if self.fail_mode in ("log", "monitor"):
                 logger.warning(f"Missing X-Capiscio-Badge header for {request.url.path} ({self.fail_mode} mode)")
                 request.state.agent = None
                 request.state.agent_id = None
-                return await call_next(request)
+                response = await call_next(request)
+                self._auto_emit_completed(request, response, request_start)
+                return response
             else:  # block
+                self._auto_emit(EventEmitter.EVENT_VERIFICATION_FAILED, {
+                    "method": request.method,
+                    "path": path,
+                    "reason": "missing_badge",
+                })
                 return JSONResponse(
                     {"error": "Missing X-Capiscio-Badge header. This endpoint is protected by CapiscIO."}, 
                     status_code=401
                 )
 
-        start_time = time.perf_counter()
+        verify_start = time.perf_counter()
         try:
             # Read the body for integrity check
             body_bytes = await request.body()
@@ -108,8 +131,28 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
             # Inject claims into request.state
             request.state.agent = payload
             request.state.agent_id = payload.get("iss")
+
+            verification_duration = (time.perf_counter() - verify_start) * 1000
+
+            # Auto-event: verification.success
+            self._auto_emit(EventEmitter.EVENT_VERIFICATION_SUCCESS, {
+                "method": request.method,
+                "path": path,
+                "caller_did": payload.get("iss"),
+                "duration_ms": round(verification_duration, 2),
+            })
             
         except VerificationError as e:
+            verification_duration = (time.perf_counter() - verify_start) * 1000
+
+            # Auto-event: verification.failed
+            self._auto_emit(EventEmitter.EVENT_VERIFICATION_FAILED, {
+                "method": request.method,
+                "path": path,
+                "reason": str(e),
+                "duration_ms": round(verification_duration, 2),
+            })
+
             if self.fail_mode in ("log", "monitor"):
                 logger.warning(f"Badge verification failed: {e} ({self.fail_mode} mode)")
                 request.state.agent = None
@@ -118,16 +161,41 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
                 async def receive() -> Dict[str, Any]:
                     return {"type": "http.request", "body": body_bytes, "more_body": False}
                 request._receive = receive
-                return await call_next(request)
+                response = await call_next(request)
+                self._auto_emit_completed(request, response, request_start)
+                return response
             else:  # block
                 return JSONResponse({"error": f"Access Denied: {str(e)}"}, status_code=403)
-        
-        verification_duration = (time.perf_counter() - start_time) * 1000
 
         response = await call_next(request)
         
         # Add Server-Timing header (standard for performance metrics)
         # Syntax: metric_name;dur=123.4;desc="Description"
         response.headers["Server-Timing"] = f"capiscio-auth;dur={verification_duration:.3f};desc=\"CapiscIO Verification\""
+
+        # Auto-event: request.completed
+        self._auto_emit_completed(request, response, request_start)
         
         return response
+
+    def _auto_emit(self, event_type: str, data: Dict[str, Any]) -> None:
+        """Emit an auto-event if emitter is configured."""
+        if self._emitter:
+            try:
+                self._emitter.emit(event_type, data)
+            except Exception:
+                logger.debug(f"Failed to emit auto-event {event_type}", exc_info=True)
+
+    def _auto_emit_completed(
+        self, request: Request, response: Response, start_time: float
+    ) -> None:
+        """Emit request.completed auto-event."""
+        if self._emitter:
+            duration_ms = (time.perf_counter() - start_time) * 1000
+            self._auto_emit(EventEmitter.EVENT_REQUEST_COMPLETED, {
+                "method": request.method,
+                "path": request.url.path,
+                "status_code": response.status_code,
+                "duration_ms": round(duration_ms, 2),
+                "caller_did": getattr(request.state, "agent_id", None),
+            })
