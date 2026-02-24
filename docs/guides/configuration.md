@@ -654,6 +654,72 @@ data:
 
 ---
 
+## Middleware Observability (Auto-Events)
+
+The `CapiscioMiddleware` can automatically emit events at key request lifecycle points, giving you visibility into traffic patterns, verification outcomes, and latency without manual instrumentation.
+
+### Enabling Auto-Events
+
+Pass an `EventEmitter` instance to the middleware:
+
+```python
+from capiscio_sdk.events import EventEmitter
+from capiscio_sdk.integrations.fastapi import CapiscioMiddleware
+
+emitter = EventEmitter(
+    agent_id="your-agent-id",
+    api_key="sk_live_...",
+    registry_url="https://registry.capisc.io"
+)
+
+app.add_middleware(
+    CapiscioMiddleware,
+    guard=guard,
+    emitter=emitter,  # Enables auto-events
+    exclude_paths=["/health"]
+)
+```
+
+### Emitted Events
+
+| Event Type | When Emitted | Fields |
+|------------|-------------|--------|
+| `request.received` | Every inbound request (after exclusion check) | `method`, `path` |
+| `verification.success` | Badge verified successfully | `method`, `path`, `caller_did`, `duration_ms` |
+| `verification.failed` | Badge missing or verification failed | `method`, `path`, `reason`, `duration_ms` |
+| `request.completed` | After response is sent | `method`, `path`, `status_code`, `duration_ms`, `caller_did` |
+
+### Privacy & Opt-In Design
+
+Auto-events are **strictly opt-in**. Without an `emitter` parameter, the middleware emits nothing — identical behavior to previous versions.
+
+This is intentional: event data includes request paths and caller identities, which may be sensitive. The developer must explicitly enable telemetry by constructing and passing an `EventEmitter`.
+
+Paths listed in `exclude_paths` (e.g., `/health`) emit no events at all.
+
+### Error Resilience
+
+Event emission is wrapped in error handling — if the emitter encounters a network error or other failure, the request proceeds normally. Observability never degrades availability.
+
+### Using with CapiscIO.connect()
+
+If you're using `CapiscIO.connect()`, the agent identity already has an emitter:
+
+```python
+from capiscio_sdk import CapiscIO
+from capiscio_sdk.integrations.fastapi import CapiscioMiddleware
+
+agent = CapiscIO.connect(api_key="sk_live_...")
+
+app.add_middleware(
+    CapiscioMiddleware,
+    guard=guard,
+    emitter=agent.emitter  # Use the agent's emitter
+)
+```
+
+---
+
 ## Common Scenarios
 
 ### API Gateway

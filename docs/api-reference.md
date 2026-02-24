@@ -201,6 +201,24 @@ This section provides detailed API documentation for all public modules in the C
     options:
       show_root_heading: false
 
+## Events
+
+::: capiscio_sdk.events
+    options:
+      members:
+        - EventEmitter
+        - EVENT_TASK_STARTED
+        - EVENT_TASK_COMPLETED
+        - EVENT_TASK_FAILED
+        - EVENT_TOOL_CALL
+        - EVENT_TOOL_RESULT
+        - EVENT_REQUEST_RECEIVED
+        - EVENT_REQUEST_COMPLETED
+        - EVENT_REQUEST_FAILED
+        - EVENT_VERIFICATION_SUCCESS
+        - EVENT_VERIFICATION_FAILED
+      show_root_heading: false
+
 ## Errors
 
 ::: capiscio_sdk.errors

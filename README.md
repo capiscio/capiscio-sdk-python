@@ -58,6 +58,30 @@ app.add_middleware(CapiscioMiddleware, guard=guard, config=config)
 | `CAPISCIO_FAIL_MODE` | `block`, `monitor`, or `log` | `block` |
 | `CAPISCIO_RATE_LIMIT_RPM` | Rate limit (requests/min) | `60` |
 
+### Middleware Observability (Auto-Events)
+
+Enable automatic event emission from the middleware to get visibility into request patterns, verification outcomes, and latency — no manual instrumentation required.
+
+```python
+from capiscio_sdk.events import EventEmitter
+from capiscio_sdk.integrations.fastapi import CapiscioMiddleware
+
+emitter = EventEmitter(agent_id="...", api_key="...", registry_url="...")
+app.add_middleware(CapiscioMiddleware, guard=guard, emitter=emitter)
+# Events flow automatically — no other code changes needed
+```
+
+The middleware emits these events when an `emitter` is provided:
+
+| Event | When | Key Fields |
+|-------|------|------------|
+| `request.received` | Every inbound request | `method`, `path` |
+| `verification.success` | Badge verified | `method`, `path`, `caller_did`, `duration_ms` |
+| `verification.failed` | Badge missing/invalid | `method`, `path`, `reason`, `duration_ms` |
+| `request.completed` | Response sent | `method`, `path`, `status_code`, `duration_ms`, `caller_did` |
+
+**Privacy note:** Auto-events are strictly opt-in. No telemetry is sent unless you explicitly pass an `emitter`. Excluded paths emit no events.
+
 ## 🛡️ What You Get (Out of the Box)
 
 1.  **Zero-Config Identity**:
