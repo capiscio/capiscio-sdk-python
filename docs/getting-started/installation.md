@@ -11,6 +11,7 @@ keywords: A2A Security installation, Python middleware, agent protection, pip in
 - **Python:** 3.10 or higher
 - **Operating System:** Linux, macOS, or Windows
 - **Dependencies:** Automatically installed via pip
+- **capiscio-core Binary:** Automatically downloaded if not found (no manual installation needed)
 
 ## Install from PyPI
 

@@ -215,6 +215,8 @@ class TestCapiscIOConnect:
                     keys_dir=None,
                     auto_badge=True,
                     dev_mode=False,
+                    domain=None,
+                    agent_card=None,
                 )
                 mock_connect.assert_called_once()
                 assert result == mock_identity
@@ -359,7 +361,7 @@ class TestConnector:
         
         result = connector._ensure_agent()
         
-        connector._client.get.assert_called_once_with("/v1/agents/specific-agent-id")
+        connector._client.get.assert_called_once_with("/v1/sdk/agents/specific-agent-id")
         assert result == {"id": "specific-agent-id", "name": "My Agent"}
 
     def test_ensure_agent_not_found(self):
@@ -454,7 +456,7 @@ class TestConnector:
         
         result = connector._create_agent()
         
-        connector._client.post.assert_called_once_with("/v1/agents", json={
+        connector._client.post.assert_called_once_with("/v1/sdk/agents", json={
             "name": "New Agent",
             "protocol": "a2a",
         })
@@ -920,7 +922,7 @@ class TestEnsureDidRegistered:
         # Should not raise, just log warning
         connector._ensure_did_registered("did:key:z6MkTest", {"kty": "OKP", "kid": "did:key:z6MkTest"})
         
-        mock_client.get.assert_called_once_with("/v1/agents/agent-123")
+        mock_client.get.assert_called_once_with("/v1/sdk/agents/agent-123")
 
     def test_server_has_same_did(self, tmp_path):
         """Test _ensure_did_registered when server already has the same DID."""

@@ -547,9 +547,20 @@ if pm.is_running():
 
 **Auto-Start Behavior:**
 - ✅ Automatically downloads `capiscio-core` binary if not found
+  - Downloads from GitHub releases (capiscio/capiscio-core)
+  - Supports macOS (arm64/x86_64), Linux (arm64/x86_64), and Windows
+  - Caches binary in `~/.capiscio/bin/` for reuse
+  - Sets executable permissions automatically on Unix-like systems
 - ✅ Starts on Unix socket by default (`~/.capiscio/rpc.sock`)
 - ✅ Handles server crashes and restarts
 - ✅ Cleans up on process exit
+
+**Binary Search Order:**
+1. `CAPISCIO_BINARY` environment variable (if set)
+2. `capiscio-core/bin/capiscio` relative to SDK (development mode)
+3. System PATH (`capiscio-core` command)
+4. Previously downloaded binary in `~/.capiscio/bin/`
+5. Auto-download from GitHub releases (latest compatible version)
 
 ## How It Works
 

@@ -201,9 +201,13 @@ class BadgeKeeper:
         """Background thread that runs the keeper loop."""
         try:
             # Initialize RPC client
+            # When rpc_address is None, CapiscioRPCClient auto-starts capiscio-core
+            # via ProcessManager (socket at ~/.capiscio/rpc.sock).
+            # Only pass an explicit address if one was configured.
             self._rpc_client = CapiscioRPCClient(
-                address=self.config.rpc_address or "unix:///tmp/capiscio.sock"
+                address=self.config.rpc_address,
             )
+            self._rpc_client.connect()
             
             logger.debug("BadgeKeeper thread started, streaming events from core...")
             
