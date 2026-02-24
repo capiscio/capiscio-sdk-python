@@ -168,6 +168,8 @@ class ProcessManager:
 
         target_path.parent.mkdir(parents=True, exist_ok=True)
         try:
+            # TODO: Add checksum verification for supply-chain security.
+            # Should verify SHA256 hash before marking binary as executable.
             with httpx.stream("GET", url, follow_redirects=True, timeout=60.0) as resp:
                 resp.raise_for_status()
                 with open(target_path, "wb") as f:

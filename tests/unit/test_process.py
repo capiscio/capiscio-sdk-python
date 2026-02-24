@@ -1,7 +1,6 @@
 """Unit tests for capiscio_sdk._rpc.process module."""
 
 import os
-import platform
 import pytest
 from pathlib import Path
 from unittest.mock import MagicMock, patch, mock_open

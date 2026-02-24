@@ -605,7 +605,7 @@ The SDK automatically manages the `capiscio-core` binary. These variables custom
 **Binary Search Order:**
 1. `CAPISCIO_BINARY` environment variable (if set)
 2. `capiscio-core/bin/capiscio` relative to SDK (development mode)
-3. System PATH (`capiscio-core` command)
+3. System PATH (`capiscio` command)
 4. Previously cached binary in `~/.capiscio/bin/`
 5. **Auto-download from GitHub releases** (v2.4.0 compatible)
 

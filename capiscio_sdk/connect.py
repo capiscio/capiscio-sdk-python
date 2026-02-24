@@ -320,6 +320,7 @@ class _Connector:
         self.dev_mode = dev_mode
         self.agent_card = agent_card
         # Derive domain: explicit > hostname from server_url
+        self._domain_explicit = domain is not None
         if domain:
             self.domain = domain
         else:
@@ -696,13 +697,15 @@ class _Connector:
                 logger.debug(f"Could not fetch agent for activation: {resp.status_code}")
                 return
             
-            agent_data = resp.json().get("data", resp.json())
+            resp_json = resp.json()
+            agent_data = resp_json.get("data", resp_json)
             
             # Merge: keep all existing fields, update status, name, domain, and agent card
             agent_data["status"] = "active"
             if self.name:
                 agent_data["name"] = self.name
-            if self.domain:
+            # Only set domain if explicitly provided or server doesn't have one
+            if self._domain_explicit or not agent_data.get("domain"):
                 agent_data["domain"] = self.domain
             if self.agent_card:
                 agent_data["agentCard"] = self.agent_card
