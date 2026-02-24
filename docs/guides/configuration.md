@@ -594,6 +594,37 @@ Load configuration from environment variables using `SecurityConfig.from_env()`.
 | `CAPISCIO_FAIL_MODE` | string | `block` | Fail mode: block, monitor, log |
 | `CAPISCIO_TIMEOUT_MS` | int | `5000` | Validation timeout (milliseconds) |
 
+### Binary Management Variables
+
+The SDK automatically manages the `capiscio-core` binary. These variables customize binary discovery and download behavior:
+
+| Variable | Type | Default | Description |
+|----------|------|---------|-------------|
+| `CAPISCIO_BINARY` | string | (auto-detect) | Path to capiscio-core binary (overrides auto-detection) |
+
+**Binary Search Order:**
+1. `CAPISCIO_BINARY` environment variable (if set)
+2. `capiscio-core/bin/capiscio` relative to SDK (development mode)
+3. System PATH (`capiscio-core` command)
+4. Previously cached binary in `~/.capiscio/bin/`
+5. **Auto-download from GitHub releases** (v2.4.0 compatible)
+
+**Auto-Download Features:**
+- ✅ Platform detection (macOS arm64/x86_64, Linux arm64/x86_64, Windows)
+- ✅ Binary caching in `~/.capiscio/bin/` directory
+- ✅ Automatic executable permissions on Unix-like systems
+- ✅ No manual installation required
+
+**Example: Custom Binary Location**
+```bash
+# Use a specific binary version
+export CAPISCIO_BINARY=/opt/capiscio/v2.4.0/capiscio-core
+
+# Or specify in code
+import os
+os.environ['CAPISCIO_BINARY'] = '/opt/capiscio/v2.4.0/capiscio-core'
+```
+
 ### Example: Docker Compose
 
 ```yaml

@@ -109,7 +109,9 @@ def _ensure_did_registered(
     }
     payload = {"did": did}
     if public_key_jwk:
-        payload["publicKey"] = public_key_jwk
+        # Server expects publicKey as a JSON string (Go *string), not a raw object.
+        # The string must contain a valid Ed25519 JWK per RFC-003.
+        payload["publicKey"] = json.dumps(public_key_jwk) if isinstance(public_key_jwk, dict) else public_key_jwk
     
     try:
         resp = httpx.patch(url, headers=headers, json=payload, timeout=30.0)
@@ -220,6 +222,8 @@ class CapiscIO:
         keys_dir: Optional[Path] = None,
         auto_badge: bool = True,
         dev_mode: bool = False,
+        domain: Optional[str] = None,
+        agent_card: Optional[dict] = None,
     ) -> AgentIdentity:
         """
         Connect to CapiscIO and get a fully-configured agent identity.
@@ -239,6 +243,8 @@ class CapiscIO:
             keys_dir: Directory for keys (default: ~/.capiscio/keys/{agent_id}/)
             auto_badge: Whether to automatically request a badge
             dev_mode: Use self-signed badges (Trust Level 0)
+            domain: Agent domain for badge issuance (default: derived from server_url host)
+            agent_card: A2A Agent Card dict to store in the registry (displayed in dashboard)
             
         Returns:
             AgentIdentity with full credentials and methods
@@ -256,6 +262,8 @@ class CapiscIO:
             keys_dir=keys_dir,
             auto_badge=auto_badge,
             dev_mode=dev_mode,
+            domain=domain,
+            agent_card=agent_card,
         )
         return connector.connect()
     
@@ -300,6 +308,8 @@ class _Connector:
         keys_dir: Optional[Path],
         auto_badge: bool,
         dev_mode: bool,
+        domain: Optional[str] = None,
+        agent_card: Optional[dict] = None,
     ):
         self.api_key = api_key
         self.name = name
@@ -308,6 +318,13 @@ class _Connector:
         self.keys_dir = keys_dir
         self.auto_badge = auto_badge
         self.dev_mode = dev_mode
+        self.agent_card = agent_card
+        # Derive domain: explicit > hostname from server_url
+        if domain:
+            self.domain = domain
+        else:
+            from urllib.parse import urlparse
+            self.domain = urlparse(self.server_url).hostname or "localhost"
         
         # HTTP client for registry API
         self._client = httpx.Client(
@@ -345,6 +362,11 @@ class _Connector:
             # If keys already exist locally, we recover the DID without calling core.
             did = self._init_identity()
             logger.info(f"DID: {did}")
+            
+            # Step 3.5: Activate agent on server
+            # The DB defaults agents to "inactive" — we need to explicitly set "active"
+            # after successful identity initialization.
+            self._activate_agent()
             
             # Step 4: Set up badge (if auto_badge)
             badge = None
@@ -393,7 +415,7 @@ class _Connector:
         try:
             if self.agent_id:
                 # Fetch specific agent
-                resp = self._client.get(f"/v1/agents/{self.agent_id}")
+                resp = self._client.get(f"/v1/sdk/agents/{self.agent_id}")
                 if resp.status_code == 200:
                     data = resp.json()
                     return data.get("data", data)
@@ -409,7 +431,7 @@ class _Connector:
                 return local_agent
             
             # List agents and find by name or use first one
-            resp = self._client.get("/v1/agents")
+            resp = self._client.get("/v1/sdk/agents")
             if resp.status_code != 200:
                 raise RuntimeError(f"Failed to list agents (status {resp.status_code})")
         except httpx.RequestError as e:
@@ -457,7 +479,7 @@ class _Connector:
                     if local_did:
                         agent_id = user_keys_dir.name
                         try:
-                            resp = self._client.get(f"/v1/agents/{agent_id}")
+                            resp = self._client.get(f"/v1/sdk/agents/{agent_id}")
                             if resp.status_code == 200:
                                 agent_data = resp.json().get("data", resp.json())
                                 server_did = agent_data.get("did")
@@ -498,7 +520,7 @@ class _Connector:
                     
                     # Verify agent exists on server with matching DID
                     try:
-                        resp = self._client.get(f"/v1/agents/{agent_id}")
+                        resp = self._client.get(f"/v1/sdk/agents/{agent_id}")
                         if resp.status_code == 200:
                             agent_data = resp.json().get("data", resp.json())
                             server_did = agent_data.get("did")
@@ -521,7 +543,7 @@ class _Connector:
         name = self.name or f"Agent-{os.urandom(4).hex()}"
         
         try:
-            resp = self._client.post("/v1/agents", json={
+            resp = self._client.post("/v1/sdk/agents", json={
                 "name": name,
                 "protocol": "a2a",
             })
@@ -616,7 +638,7 @@ class _Connector:
         """
         try:
             # Check if server already has a DID for this agent
-            resp = self._client.get(f"/v1/agents/{self.agent_id}")
+            resp = self._client.get(f"/v1/sdk/agents/{self.agent_id}")
             if resp.status_code != 200:
                 logger.warning(f"Failed to check agent DID status: {resp.status_code}")
                 return None
@@ -634,9 +656,12 @@ class _Connector:
             # Server has no DID - try to register using PATCH (partial update)
             logger.info("Registering DID with server...")
             
+            # Server expects publicKey as a JSON string (Go *string), not a raw object.
+            # The string must contain a valid Ed25519 JWK per RFC-003.
+            pk_str = json.dumps(public_jwk) if isinstance(public_jwk, dict) else public_jwk
             resp = self._client.patch(
                 f"/v1/sdk/agents/{self.agent_id}/identity",
-                json={"did": did, "publicKey": public_jwk},
+                json={"did": did, "publicKey": pk_str},
             )
             
             if resp.status_code == 200:
@@ -653,6 +678,51 @@ class _Connector:
             logger.warning(f"DID registration check failed: {e} - continuing with local DID")
         
         return None
+    
+    def _activate_agent(self):
+        """Set agent status to 'active' on the server.
+        
+        The DB defaults agents to 'inactive'. After successful identity
+        initialization, we activate the agent so the dashboard shows
+        the correct status and badge flow can proceed.
+        
+        Uses GET-then-PUT to avoid overwriting existing fields with zero values,
+        since the server's UpdateAgent writes all fields from the map.
+        """
+        try:
+            # First, fetch the current agent data to preserve existing fields
+            resp = self._client.get(f"/v1/sdk/agents/{self.agent_id}")
+            if resp.status_code != 200:
+                logger.debug(f"Could not fetch agent for activation: {resp.status_code}")
+                return
+            
+            agent_data = resp.json().get("data", resp.json())
+            
+            # Merge: keep all existing fields, update status, name, domain, and agent card
+            agent_data["status"] = "active"
+            if self.name:
+                agent_data["name"] = self.name
+            if self.domain:
+                agent_data["domain"] = self.domain
+            if self.agent_card:
+                agent_data["agentCard"] = self.agent_card
+            
+            # Remove server-managed fields that shouldn't be sent back
+            for field in ("created_at", "updated_at", "user_id", "org_id", "trust_level"):
+                agent_data.pop(field, None)
+            
+            resp = self._client.put(
+                f"/v1/sdk/agents/{self.agent_id}",
+                json=agent_data,
+            )
+            
+            if resp.status_code == 200:
+                logger.info("Agent activated on server")
+            else:
+                logger.debug(f"Agent activation returned {resp.status_code} - non-critical")
+        except Exception as e:
+            # Don't fail connection just because activation failed
+            logger.debug(f"Agent activation failed: {e} - non-critical")
     
     def _setup_badge(self):
         """Set up BadgeKeeper for automatic badge management."""

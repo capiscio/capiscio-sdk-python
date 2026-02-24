@@ -1,16 +1,28 @@
 """Process manager for the capiscio-core gRPC server."""
 
 import atexit
+import logging
 import os
+import platform
 import shutil
+import stat
 import subprocess
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
+
+import httpx
+
+logger = logging.getLogger(__name__)
 
 # Default socket path
 DEFAULT_SOCKET_DIR = Path.home() / ".capiscio"
 DEFAULT_SOCKET_PATH = DEFAULT_SOCKET_DIR / "rpc.sock"
+
+# Binary download configuration
+CORE_VERSION = "2.4.0"
+GITHUB_REPO = "capiscio/capiscio-core"
+CACHE_DIR = DEFAULT_SOCKET_DIR / "bin"
 
 
 class ProcessManager:
@@ -72,8 +84,9 @@ class ProcessManager:
         
         Search order:
         1. CAPISCIO_BINARY environment variable
-        2. capiscio-core/bin/capiscio relative to SDK
+        2. capiscio-core/bin/capiscio relative to SDK (development)
         3. System PATH
+        4. Downloaded binary in ~/.capiscio/bin/
         """
         # Check environment variable
         env_path = os.environ.get("CAPISCIO_BINARY")
@@ -96,7 +109,85 @@ class ProcessManager:
         if which_result:
             return Path(which_result)
         
+        # Check previously downloaded binary
+        cached = self._get_cached_binary_path()
+        if cached.exists():
+            return cached
+        
         return None
+
+    @staticmethod
+    def _get_platform_info() -> Tuple[str, str]:
+        """Determine OS and architecture for binary download."""
+        system = platform.system().lower()
+        machine = platform.machine().lower()
+
+        if system == "darwin":
+            os_name = "darwin"
+        elif system == "linux":
+            os_name = "linux"
+        elif system == "windows":
+            os_name = "windows"
+        else:
+            raise RuntimeError(f"Unsupported operating system: {system}")
+
+        if machine in ("x86_64", "amd64"):
+            arch_name = "amd64"
+        elif machine in ("arm64", "aarch64"):
+            arch_name = "arm64"
+        else:
+            raise RuntimeError(f"Unsupported architecture: {machine}")
+
+        return os_name, arch_name
+
+    @staticmethod
+    def _get_cached_binary_path() -> Path:
+        """Get the path where the downloaded binary would be cached."""
+        os_name, arch_name = ProcessManager._get_platform_info()
+        ext = ".exe" if os_name == "windows" else ""
+        filename = f"capiscio-{os_name}-{arch_name}{ext}"
+        return CACHE_DIR / CORE_VERSION / filename
+
+    def _download_binary(self) -> Path:
+        """Download the capiscio-core binary for the current platform.
+        
+        Downloads from GitHub releases to ~/.capiscio/bin/<version>/.
+        Returns the path to the executable.
+        """
+        os_name, arch_name = self._get_platform_info()
+        target_path = self._get_cached_binary_path()
+
+        if target_path.exists():
+            return target_path
+
+        ext = ".exe" if os_name == "windows" else ""
+        filename = f"capiscio-{os_name}-{arch_name}{ext}"
+        url = f"https://github.com/{GITHUB_REPO}/releases/download/v{CORE_VERSION}/{filename}"
+
+        logger.info("Downloading capiscio-core v%s for %s/%s...", CORE_VERSION, os_name, arch_name)
+
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with httpx.stream("GET", url, follow_redirects=True, timeout=60.0) as resp:
+                resp.raise_for_status()
+                with open(target_path, "wb") as f:
+                    for chunk in resp.iter_bytes(chunk_size=8192):
+                        f.write(chunk)
+
+            # Make executable
+            st = os.stat(target_path)
+            os.chmod(target_path, st.st_mode | stat.S_IEXEC)
+
+            logger.info("Installed capiscio-core v%s at %s", CORE_VERSION, target_path)
+            return target_path
+
+        except Exception as e:
+            if target_path.exists():
+                target_path.unlink()
+            raise RuntimeError(
+                f"Failed to download capiscio-core from {url}: {e}\n"
+                "You can also set CAPISCIO_BINARY to point to an existing binary."
+            ) from e
     
     def ensure_running(
         self,
@@ -129,12 +220,7 @@ class ProcessManager:
         # Find binary
         binary = self.find_binary()
         if binary is None:
-            raise RuntimeError(
-                "capiscio binary not found. Please either:\n"
-                "  1. Set CAPISCIO_BINARY environment variable\n"
-                "  2. Install capiscio-core and add to PATH\n"
-                "  3. Build capiscio-core locally"
-            )
+            binary = self._download_binary()
         self._binary_path = binary
         
         # Set up socket path

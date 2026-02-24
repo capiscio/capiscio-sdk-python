@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Automatic Binary Download**: SDK now automatically downloads capiscio-core binary if not found
+  - Downloads from GitHub releases (defaults to v2.4.0)
+  - Platform detection for macOS (arm64/x86_64), Linux (arm64/x86_64), and Windows
+  - Binary caching in `~/.capiscio/bin/` directory
+  - Automatic executable permissions for Unix-like systems
+  - Fallback search order: `CAPISCIO_BINARY` env var → local development path → system PATH → cached binary → auto-download
+
+### Changed
+- **Improved Process Management**: Enhanced error logging and binary discovery
+
 ## [2.4.1] - 2026-02-08
 
 ### Added
