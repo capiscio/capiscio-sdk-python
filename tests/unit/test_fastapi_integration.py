@@ -9,6 +9,7 @@ from unittest.mock import MagicMock, patch
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from capiscio_sdk.errors import VerificationError
+from capiscio_sdk.events import EventEmitter
 from capiscio_sdk.integrations.fastapi import CapiscioMiddleware
 from capiscio_sdk.config import SecurityConfig, DownstreamConfig
 
@@ -425,3 +426,223 @@ class TestSecurityConfigIntegration:
         data = response.json()
         assert data["agent"] is None
         assert data["agent_id"] is None
+
+
+class TestAutoEvents:
+    """Tests for middleware auto-event emission."""
+
+    def _make_app(self, mock_guard, emitter, **middleware_kwargs):
+        app = FastAPI()
+        app.add_middleware(
+            CapiscioMiddleware,
+            guard=mock_guard,
+            emitter=emitter,
+            exclude_paths=["/.well-known/agent.json"],
+            **middleware_kwargs,
+        )
+
+        @app.post("/tasks/send")
+        async def send_task(request: Request):
+            return {"agent_id": getattr(request.state, "agent_id", None)}
+
+        @app.get("/.well-known/agent.json")
+        async def agent_card():
+            return {"name": "test"}
+
+        return app
+
+    def test_auto_events_on_successful_request(self):
+        """Emitter receives request.received, verification.success, request.completed."""
+        guard = MagicMock()
+        guard.agent_id = "test-agent"
+        guard.verify_inbound.return_value = {"iss": "did:key:caller123", "sub": "recipient"}
+
+        emitter = MagicMock(spec=EventEmitter)
+
+        app = self._make_app(guard, emitter)
+        client = TestClient(app)
+
+        body = json.dumps({"message": "hello"}).encode()
+        response = client.post(
+            "/tasks/send",
+            content=body,
+            headers={"X-Capiscio-Badge": "valid.jws.token", "Content-Type": "application/json"},
+        )
+        assert response.status_code == 200
+
+        event_types = [c.args[0] for c in emitter.emit.call_args_list]
+        assert "request.received" in event_types
+        assert "verification.success" in event_types
+        assert "request.completed" in event_types
+
+        # Verify request.received data
+        received_call = next(c for c in emitter.emit.call_args_list if c.args[0] == "request.received")
+        assert received_call.args[1]["method"] == "POST"
+        assert received_call.args[1]["path"] == "/tasks/send"
+
+        # Verify verification.success data
+        success_call = next(c for c in emitter.emit.call_args_list if c.args[0] == "verification.success")
+        assert success_call.args[1]["caller_did"] == "did:key:caller123"
+        assert "duration_ms" in success_call.args[1]
+
+        # Verify request.completed data
+        completed_call = next(c for c in emitter.emit.call_args_list if c.args[0] == "request.completed")
+        assert completed_call.args[1]["status_code"] == 200
+        assert "duration_ms" in completed_call.args[1]
+
+    def test_auto_events_on_missing_badge_block(self):
+        """Emitter receives request.received and verification.failed when badge missing."""
+        guard = MagicMock()
+        guard.agent_id = "test-agent"
+
+        emitter = MagicMock(spec=EventEmitter)
+
+        app = self._make_app(guard, emitter)
+        client = TestClient(app)
+
+        response = client.post("/tasks/send", json={"msg": "hi"})
+        assert response.status_code == 401
+
+        event_types = [c.args[0] for c in emitter.emit.call_args_list]
+        assert "request.received" in event_types
+        assert "verification.failed" in event_types
+        # No request.completed on blocked requests
+        assert "request.completed" not in event_types
+
+        failed_call = next(c for c in emitter.emit.call_args_list if c.args[0] == "verification.failed")
+        assert failed_call.args[1]["reason"] == "missing_badge"
+
+    def test_auto_events_on_verification_failure_block(self):
+        """Emitter receives verification.failed when badge is invalid."""
+        guard = MagicMock()
+        guard.agent_id = "test-agent"
+        guard.verify_inbound.side_effect = VerificationError("Bad signature")
+
+        emitter = MagicMock(spec=EventEmitter)
+
+        app = self._make_app(guard, emitter)
+        client = TestClient(app)
+
+        response = client.post(
+            "/tasks/send",
+            json={"msg": "hi"},
+            headers={"X-Capiscio-Badge": "bad.jws.token"},
+        )
+        assert response.status_code == 403
+
+        event_types = [c.args[0] for c in emitter.emit.call_args_list]
+        assert "request.received" in event_types
+        assert "verification.failed" in event_types
+
+        failed_call = next(c for c in emitter.emit.call_args_list if c.args[0] == "verification.failed")
+        assert failed_call.args[1]["reason"] == "Bad signature"
+        assert "duration_ms" in failed_call.args[1]
+
+    def test_auto_events_on_verification_failure_log_mode(self):
+        """In log mode, verification.failed + request.completed both emitted."""
+        guard = MagicMock()
+        guard.agent_id = "test-agent"
+        guard.verify_inbound.side_effect = VerificationError("Expired badge")
+
+        emitter = MagicMock(spec=EventEmitter)
+
+        config = SecurityConfig(
+            downstream=DownstreamConfig(require_signatures=True),
+            fail_mode="log",
+        )
+        app = self._make_app(guard, emitter, config=config)
+        client = TestClient(app)
+
+        response = client.post(
+            "/tasks/send",
+            json={"msg": "hi"},
+            headers={"X-Capiscio-Badge": "expired.jws.token"},
+        )
+        assert response.status_code == 200
+
+        event_types = [c.args[0] for c in emitter.emit.call_args_list]
+        assert "request.received" in event_types
+        assert "verification.failed" in event_types
+        assert "request.completed" in event_types
+
+    def test_auto_events_on_missing_badge_log_mode(self):
+        """In log mode with missing badge, verification.failed + request.completed both emitted."""
+        guard = MagicMock()
+        guard.agent_id = "test-agent"
+
+        emitter = MagicMock(spec=EventEmitter)
+
+        config = SecurityConfig(
+            downstream=DownstreamConfig(require_signatures=True),
+            fail_mode="log",
+        )
+        app = self._make_app(guard, emitter, config=config)
+        client = TestClient(app)
+
+        response = client.post("/tasks/send", json={"msg": "hi"})
+        assert response.status_code == 200
+
+        event_types = [c.args[0] for c in emitter.emit.call_args_list]
+        assert "request.received" in event_types
+        assert "verification.failed" in event_types
+        assert "request.completed" in event_types
+
+        failed_call = next(c for c in emitter.emit.call_args_list if c.args[0] == "verification.failed")
+        assert failed_call.args[1]["reason"] == "missing_badge"
+        assert "duration_ms" in failed_call.args[1]
+
+    def test_no_auto_events_without_emitter(self):
+        """Without emitter, middleware works normally (backward compat)."""
+        guard = MagicMock()
+        guard.agent_id = "test-agent"
+        guard.verify_inbound.return_value = {"iss": "did:key:abc", "sub": "test"}
+
+        app = FastAPI()
+        app.add_middleware(CapiscioMiddleware, guard=guard)
+
+        @app.post("/test")
+        async def test_endpoint(request: Request):
+            return {"ok": True}
+
+        client = TestClient(app)
+        response = client.post(
+            "/test",
+            json={},
+            headers={"X-Capiscio-Badge": "valid.token"},
+        )
+        assert response.status_code == 200
+
+    def test_no_auto_events_for_excluded_paths(self):
+        """Excluded paths don't trigger any auto-events."""
+        guard = MagicMock()
+        guard.agent_id = "test-agent"
+
+        emitter = MagicMock(spec=EventEmitter)
+
+        app = self._make_app(guard, emitter)
+        client = TestClient(app)
+
+        response = client.get("/.well-known/agent.json")
+        assert response.status_code == 200
+
+        emitter.emit.assert_not_called()
+
+    def test_auto_event_emitter_error_does_not_break_request(self):
+        """If emitter throws, the request still succeeds."""
+        guard = MagicMock()
+        guard.agent_id = "test-agent"
+        guard.verify_inbound.return_value = {"iss": "did:key:abc", "sub": "test"}
+
+        emitter = MagicMock(spec=EventEmitter)
+        emitter.emit.side_effect = Exception("Network error")
+
+        app = self._make_app(guard, emitter)
+        client = TestClient(app)
+
+        response = client.post(
+            "/tasks/send",
+            json={"msg": "hi"},
+            headers={"X-Capiscio-Badge": "valid.token"},
+        )
+        # Request should still succeed even if emitter fails
+        assert response.status_code == 200

@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Binary caching in `~/.capiscio/bin/` directory
   - Automatic executable permissions for Unix-like systems
   - Fallback search order: `CAPISCIO_BINARY` env var → local development path → system PATH → cached binary → auto-download
+- **Middleware Auto-Events**: `CapiscioMiddleware` now supports automatic event emission
+  - Opt-in via `emitter` parameter — pass an `EventEmitter` to enable
+  - Emits `request.received`, `verification.success`/`verification.failed`, and `request.completed` events
+  - Standardized fields: `method`, `path`, `caller_did`, `duration_ms`, `status_code`
+  - Safe by design: emitter errors never break request handling
+  - Excluded paths emit no events
+  - New event type constants: `EVENT_REQUEST_RECEIVED`, `EVENT_REQUEST_COMPLETED`, `EVENT_REQUEST_FAILED`, `EVENT_VERIFICATION_SUCCESS`, `EVENT_VERIFICATION_FAILED`
 
 ### Changed
 - **Improved Process Management**: Enhanced error logging and binary discovery

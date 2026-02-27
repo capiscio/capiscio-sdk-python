@@ -58,6 +58,12 @@ class EventEmitter:
     EVENT_ERROR = "error"
     EVENT_WARNING = "warning"
     EVENT_INFO = "info"
+
+    # Middleware auto-event types (emitted automatically by CapiscioMiddleware)
+    EVENT_REQUEST_RECEIVED = "request.received"
+    EVENT_REQUEST_COMPLETED = "request.completed"
+    EVENT_VERIFICATION_SUCCESS = "verification.success"
+    EVENT_VERIFICATION_FAILED = "verification.failed"
     
     def __init__(
         self,
