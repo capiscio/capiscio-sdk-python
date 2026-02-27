@@ -62,7 +62,6 @@ class EventEmitter:
     # Middleware auto-event types (emitted automatically by CapiscioMiddleware)
     EVENT_REQUEST_RECEIVED = "request.received"
     EVENT_REQUEST_COMPLETED = "request.completed"
-    EVENT_REQUEST_FAILED = "request.failed"
     EVENT_VERIFICATION_SUCCESS = "verification.success"
     EVENT_VERIFICATION_FAILED = "verification.failed"
     

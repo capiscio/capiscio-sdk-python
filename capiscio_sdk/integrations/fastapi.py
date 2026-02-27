@@ -29,8 +29,9 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
         exclude_paths: List of paths to skip verification (e.g., ["/health", "/.well-known/agent-card.json"]).
         config: Optional SecurityConfig to control enforcement behavior.
         emitter: Optional EventEmitter for auto-event emission. When provided,
-            the middleware automatically emits request.received, request.completed,
-            verification.success, and verification.failed events.
+            the middleware automatically emits request.received, verification.success,
+            and verification.failed events. request.completed is emitted for requests
+            that reach the downstream ASGI app; blocked 4xx responses do not emit it.
     
     Security behavior:
         - If config is None, defaults to strict blocking mode
@@ -99,6 +100,12 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
             # Badge required but missing
             if self.fail_mode in ("log", "monitor"):
                 logger.warning(f"Missing X-Capiscio-Badge header for {request.url.path} ({self.fail_mode} mode)")
+                self._auto_emit(EventEmitter.EVENT_VERIFICATION_FAILED, {
+                    "method": request.method,
+                    "path": path,
+                    "reason": "missing_badge",
+                    "duration_ms": round((time.perf_counter() - request_start) * 1000, 2),
+                })
                 request.state.agent = None
                 request.state.agent_id = None
                 response = await call_next(request)
@@ -109,6 +116,7 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
                     "method": request.method,
                     "path": path,
                     "reason": "missing_badge",
+                    "duration_ms": round((time.perf_counter() - request_start) * 1000, 2),
                 })
                 return JSONResponse(
                     {"error": "Missing X-Capiscio-Badge header. This endpoint is protected by CapiscIO."}, 

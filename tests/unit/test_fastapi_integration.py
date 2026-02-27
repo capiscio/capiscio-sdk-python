@@ -5,7 +5,7 @@ since the actual Go core may not be running during unit tests.
 """
 import json
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from capiscio_sdk.errors import VerificationError
@@ -564,6 +564,32 @@ class TestAutoEvents:
         assert "request.received" in event_types
         assert "verification.failed" in event_types
         assert "request.completed" in event_types
+
+    def test_auto_events_on_missing_badge_log_mode(self):
+        """In log mode with missing badge, verification.failed + request.completed both emitted."""
+        guard = MagicMock()
+        guard.agent_id = "test-agent"
+
+        emitter = MagicMock(spec=EventEmitter)
+
+        config = SecurityConfig(
+            downstream=DownstreamConfig(require_signatures=True),
+            fail_mode="log",
+        )
+        app = self._make_app(guard, emitter, config=config)
+        client = TestClient(app)
+
+        response = client.post("/tasks/send", json={"msg": "hi"})
+        assert response.status_code == 200
+
+        event_types = [c.args[0] for c in emitter.emit.call_args_list]
+        assert "request.received" in event_types
+        assert "verification.failed" in event_types
+        assert "request.completed" in event_types
+
+        failed_call = next(c for c in emitter.emit.call_args_list if c.args[0] == "verification.failed")
+        assert failed_call.args[1]["reason"] == "missing_badge"
+        assert "duration_ms" in failed_call.args[1]
 
     def test_no_auto_events_without_emitter(self):
         """Without emitter, middleware works normally (backward compat)."""
