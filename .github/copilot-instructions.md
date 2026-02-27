@@ -1,6 +1,6 @@
 # capiscio-sdk-python - GitHub Copilot Instructions
 
-## 🛑 ABSOLUTE RULES - NO EXCEPTIONS
+## ABSOLUTE RULES - NO EXCEPTIONS
 
 These rules are non-negotiable. Violating them will cause production issues.
 
@@ -11,7 +11,8 @@ These rules are non-negotiable. Violating them will cause production issues.
 
 ### 2. LOCAL CI VALIDATION BEFORE PUSH
 - **ALL tests MUST pass locally before pushing to a PR.**
-- Run: `pytest -v`
+- Run: `.venv/bin/python -m pytest tests/unit -v`
+- System Python may not have pytest — always use the project venv.
 - If tests fail locally, fix them before pushing. Never push failing code.
 
 ### 3. RFCs ARE READ-ONLY
@@ -24,488 +25,277 @@ These rules are non-negotiable. Violating them will cause production issues.
 
 ---
 
+## CRITICAL: Read First
+
+**Before starting work, read the workspace context files:**
+1. `../../.context/CURRENT_SPRINT.md` - Sprint goals and priorities
+2. `../../.context/ACTIVE_TASKS.md` - Active tasks (check for conflicts)
+3. `../../.context/SESSION_LOG.md` - Recent session history
+
+**After significant work, update:**
+- `../../.context/ACTIVE_TASKS.md` - Update task status
+- `../../.context/SESSION_LOG.md` - Log what was done
+
+---
+
 ## Repository Purpose
 
 **capiscio-sdk-python** is the official Python SDK for CapiscIO, providing:
-- SimpleGuard: Runtime badge verification middleware
-- gRPC Client: Interface to capiscio-core gRPC services
-- Badge verification utilities
-- DID resolution helpers
+- **CapiscIO.connect()** - "Let's Encrypt" style one-liner for agent identity (DID + badge + events)
+- **SimpleGuard** - Message signing/verification via capiscio-core Go gRPC
+- **CapiscioMiddleware** - FastAPI/Starlette ASGI middleware for badge verification + auto-events
+- **EventEmitter** - Batched event emission to CapiscIO registry
+- **BadgeKeeper** - Automatic badge renewal for continuous operation
+- **Validators** - Agent Card, message, protocol, signature validation (CoreValidator uses Go core)
+- **CapiscioSecurityExecutor** - A2A agent wrapper with validation, rate-limiting, caching
 
-**Technology Stack**: Python 3.9+, gRPC, cryptography, FastAPI/Flask integration
+**Technology Stack**: Python 3.9+, gRPC (to capiscio-core Go binary), httpx, pydantic, cachetools
+
+**Current Version**: v2.4.1
+**Default Branch:** `main`
+
+---
 
 ## Architecture
 
+The SDK follows a **"Thin SDK + Core gRPC"** pattern. All cryptographic operations
+(key generation, signing, DID derivation, badge verification) are performed by the
+capiscio-core Go binary via gRPC, ensuring consistency across all language SDKs.
+
 ```
 capiscio_sdk/
-├── __init__.py
-├── simple_guard.py          # Middleware for FastAPI/Flask
-├── grpc_client.py           # gRPC client for capiscio-core
-├── badge_verifier.py        # Badge verification logic
-├── did_resolver.py          # DID resolution
-├── models.py                # Data models
-└── exceptions.py            # Custom exceptions
+├── __init__.py              # Public API: secure(), SimpleGuard, SecurityConfig, errors, types
+├── connect.py               # CapiscIO.connect() - one-liner agent identity setup
+├── simple_guard.py          # SimpleGuard - message signing/verification via gRPC
+├── events.py                # EventEmitter - batched event emission (10 events / 5s flush)
+├── badge.py                 # Badge API - verify_badge(), get_badge(), issue helpers
+├── badge_keeper.py          # BadgeKeeper - automatic badge renewal daemon thread
+├── dv.py                    # Domain Validation badge orders (RFC-002 v1.2)
+├── executor.py              # CapiscioSecurityExecutor - A2A agent wrapper
+├── config.py                # SecurityConfig, DownstreamConfig, UpstreamConfig (pydantic)
+├── errors.py                # CapiscioSecurityError, ValidationError, SignatureError, etc.
+├── types.py                 # ValidationResult, ValidationIssue, ValidationSeverity (pydantic)
+├── _rpc/
+│   ├── client.py            # CapiscioRPCClient - gRPC wrapper for capiscio-core
+│   ├── process.py           # ProcessManager - auto-downloads and manages the Go binary
+│   └── gen/capiscio/v1/     # Generated protobuf stubs (simpleguard, badge, did, mcp, etc.)
+├── integrations/
+│   └── fastapi.py           # CapiscioMiddleware - ASGI middleware with auto-events
+├── validators/
+│   ├── __init__.py          # CoreValidator (Go-backed), MessageValidator, ProtocolValidator
+│   ├── _core.py             # CoreValidator implementation (gRPC to Go)
+│   ├── agent_card.py        # AgentCardValidator (DEPRECATED - use CoreValidator)
+│   ├── certificate.py       # Certificate validation
+│   ├── message.py           # A2A message structure validation
+│   ├── protocol.py          # A2A protocol compliance validation
+│   ├── semver.py            # Semantic version validation
+│   ├── signature.py         # Signature validation
+│   └── url_security.py      # URL and SSRF validation
+├── scoring/                 # DEPRECATED - scoring now in Go core
+│   ├── trust.py, availability.py, compliance.py, types.py
+└── infrastructure/
+    ├── cache.py             # TTL cache for validation results
+    └── rate_limiter.py      # Rate limiting for downstream requests
 ```
+
+### Key Architectural Decisions
+
+1. **Crypto in Go, integration in Python** - All crypto ops go through `CapiscioRPCClient` → Go core gRPC.
+   The Go binary is auto-downloaded by `ProcessManager` on first use.
+2. **CoreValidator over pure Python** - `CoreValidator` delegates Agent Card validation to Go core.
+   The old `AgentCardValidator` is deprecated.
+3. **EventEmitter batching** - Events are queued and flushed in batches of 10 or every 5 seconds.
+4. **Auto-events are opt-in** - `CapiscioMiddleware` emits request lifecycle events only when
+   an `EventEmitter` instance is explicitly passed.
+
+---
 
 ## Critical Development Rules
 
-### 1. SimpleGuard Middleware
+### 1. CapiscIO.connect() - Agent Identity Setup
 
-**FastAPI Integration:**
 ```python
-from fastapi import FastAPI, HTTPException, Request
-from capiscio_sdk import SimpleGuard, BadgeVerificationError
+from capiscio_sdk.connect import CapiscIO
+
+# One-liner: generates keys, derives DID, registers, gets badge
+agent = CapiscIO.connect(api_key="sk_live_...")
+
+print(agent.did)           # did:key:z6Mk...
+print(agent.badge)         # Current JWS badge token (auto-renewed)
+agent.emit("task_started", {"task_id": "123"})
+```
+
+### 2. SimpleGuard - Message Signing & Verification
+
+```python
+from capiscio_sdk import SimpleGuard
+
+guard = SimpleGuard(dev_mode=True)  # or pass key_dir, registry_url
+token = guard.sign_outbound({"sub": "test"}, body=b"hello")
+claims = guard.verify_inbound(token, body=b"hello")
+```
+
+All crypto is delegated to Go core via `CapiscioRPCClient`.
+
+### 3. CapiscioMiddleware - FastAPI/Starlette Integration
+
+```python
+from fastapi import FastAPI
+from capiscio_sdk.integrations.fastapi import CapiscioMiddleware
+from capiscio_sdk.events import EventEmitter
 
 app = FastAPI()
 
-# Initialize SimpleGuard
-guard = SimpleGuard(
+# Without auto-events (badge verification only)
+app.add_middleware(CapiscioMiddleware,
     issuer_url="https://registry.capisc.io",
-    min_trust_level=1,  # Don't accept self-signed
-    cache_ttl=300,      # 5 minutes
+    mode="enforce",              # "enforce" | "log"
+    exclude_paths=["/health"],
 )
 
-@app.middleware("http")
-async def verify_badge_middleware(request: Request, call_next):
-    # Skip health checks
-    if request.url.path == "/health":
-        return await call_next(request)
-    
-    # Extract badge from header
-    badge_token = request.headers.get("X-CapiscIO-Badge")
-    if not badge_token:
-        raise HTTPException(status_code=401, detail="Missing badge")
-    
-    # Verify badge
-    try:
-        badge = await guard.verify(badge_token)
-        request.state.badge = badge
-        request.state.agent_did = badge.subject
-    except BadgeVerificationError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-    
-    return await call_next(request)
-
-@app.get("/protected")
-async def protected_route(request: Request):
-    agent_did = request.state.agent_did
-    return {"message": f"Hello {agent_did}"}
-```
-
-**Flask Integration:**
-```python
-from flask import Flask, request, g, jsonify
-from capiscio_sdk import SimpleGuard, BadgeVerificationError
-
-app = Flask(__name__)
-
-guard = SimpleGuard(
+# With auto-events (opt-in observability)
+emitter = EventEmitter(
+    server_url="https://registry.capisc.io",
+    api_key="sk_live_...",
+    agent_id="my-agent",
+)
+app.add_middleware(CapiscioMiddleware,
     issuer_url="https://registry.capisc.io",
-    min_trust_level=1,
-)
-
-@app.before_request
-def verify_badge():
-    # Skip health checks
-    if request.path == "/health":
-        return None
-    
-    # Extract badge
-    badge_token = request.headers.get("X-CapiscIO-Badge")
-    if not badge_token:
-        return jsonify({"error": "Missing badge"}), 401
-    
-    # Verify badge
-    try:
-        badge = guard.verify_sync(badge_token)
-        g.badge = badge
-        g.agent_did = badge.subject
-    except BadgeVerificationError as e:
-        return jsonify({"error": str(e)}), 401
-
-@app.route("/protected")
-def protected_route():
-    return jsonify({"message": f"Hello {g.agent_did}"})
-```
-
-### 2. gRPC Client Usage
-
-**Initialize Client:**
-```python
-from capiscio_sdk import CapiscioGRPCClient
-
-# Connect to capiscio-core gRPC server
-client = CapiscioGRPCClient(
-    address="localhost:50051",
-    secure=False,  # Use TLS in production
+    mode="enforce",
+    exclude_paths=["/health"],
+    emitter=emitter,             # Enables request_received/completed/failed events
 )
 ```
 
-**Badge Verification:**
-```python
-from capiscio_sdk.grpc_client import VerifyBadgeRequest
+Auto-events emitted: `request_received`, `request_completed`, `request_failed`,
+`verification_success`, `verification_failed`.
 
-# Verify badge via gRPC
-request = VerifyBadgeRequest(
-    token="eyJhbGc...",
-    issuer_url="https://registry.capisc.io",
+### 4. EventEmitter - Batched Event Pipeline
+
+```python
+from capiscio_sdk.events import EventEmitter
+
+emitter = EventEmitter(
+    server_url="https://registry.capisc.io",
+    api_key="sk_live_...",
+    agent_id="my-agent-id",
+    batch_size=10,       # Flush every 10 events
+    flush_interval=5.0,  # Or every 5 seconds
 )
 
-response = client.verify_badge(request)
-
-if response.valid:
-    print(f"Badge valid for {response.badge.subject}")
-    print(f"Trust level: {response.badge.trust_level}")
-else:
-    print(f"Badge invalid: {response.error}")
+emitter.emit("task_started", {"task_id": "123"})
+emitter.emit("tool_call", {"tool": "search"})
+emitter.flush()  # Force flush
+emitter.close()  # Flush + stop background thread
 ```
 
-**DID Resolution:**
-```python
-from capiscio_sdk.grpc_client import ResolveDIDRequest
+Events go to `POST /v1/events` on the CapiscIO registry server.
 
-request = ResolveDIDRequest(
-    did="did:web:registry.capisc.io:agents:my-agent"
+### 5. CapiscioRPCClient - Go Core gRPC Interface
+
+```python
+from capiscio_sdk._rpc.client import CapiscioRPCClient
+
+client = CapiscioRPCClient()  # Auto-starts Go binary via ProcessManager
+# Services: SimpleGuardService, BadgeService, DIDService, MCPService,
+#           TrustStoreService, RevocationService, ScoringService
+```
+
+**Never instantiate gRPC directly** — always use `CapiscioRPCClient` which handles
+process lifecycle, port management, and health checks.
+
+### 6. Error Hierarchy
+
+```python
+from capiscio_sdk.errors import (
+    CapiscioSecurityError,       # Base
+    CapiscioValidationError,     # Validation failures
+    CapiscioSignatureError,      # Signature verification failures
+    CapiscioRateLimitError,      # Rate limit exceeded
+    CapiscioUpstreamError,       # Upstream agent errors
+    ConfigurationError,          # Bad config / missing keys
+    VerificationError,           # Badge/signature verification
 )
-
-response = client.resolve_did(request)
-
-if response.success:
-    print(f"Public key: {response.did_document.verification_method[0].public_key_jwk}")
-else:
-    print(f"Resolution failed: {response.error}")
 ```
 
-**Gateway Validation:**
-```python
-from capiscio_sdk.grpc_client import ValidateGatewayRequest
-
-# Validate incoming request at gateway
-request = ValidateGatewayRequest(
-    badge_token="eyJhbGc...",
-    target_url="https://agent.example.com/endpoint",
-    min_trust_level=1,
-)
-
-response = client.validate_gateway(request)
-
-if response.allowed:
-    print(f"Request allowed for agent: {response.agent_did}")
-else:
-    print(f"Request denied: {response.reason}")
-```
-
-### 3. Badge Verification Logic
-
-**Core Verification Function:**
-```python
-import jwt
-import requests
-from typing import Dict, Any
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-
-class BadgeVerifier:
-    def __init__(self, issuer_url: str, min_trust_level: int = 1):
-        self.issuer_url = issuer_url
-        self.min_trust_level = min_trust_level
-        self._jwks_cache: Dict[str, Any] = {}
-    
-    async def verify(self, token: str) -> Badge:
-        # Step 1: Parse token
-        unverified_claims = jwt.decode(
-            token,
-            options={"verify_signature": False}
-        )
-        
-        # Step 2: Fetch JWKS
-        jwks = await self._fetch_jwks(unverified_claims["iss"])
-        
-        # Step 3: Verify signature
-        try:
-            claims = jwt.decode(
-                token,
-                key=jwks,
-                algorithms=["EdDSA"],
-                options={"verify_signature": True}
-            )
-        except jwt.InvalidSignatureError:
-            raise BadgeVerificationError("Invalid signature")
-        
-        # Step 4: Validate claims
-        self._validate_claims(claims)
-        
-        # Step 5: Create badge object
-        return Badge.from_claims(claims)
-    
-    async def _fetch_jwks(self, issuer: str) -> Dict[str, Any]:
-        # Check cache
-        if issuer in self._jwks_cache:
-            return self._jwks_cache[issuer]
-        
-        # Fetch from issuer
-        jwks_url = f"{issuer}/.well-known/jwks.json"
-        response = requests.get(jwks_url, timeout=5)
-        response.raise_for_status()
-        
-        jwks = response.json()
-        self._jwks_cache[issuer] = jwks
-        
-        return jwks
-    
-    def _validate_claims(self, claims: Dict[str, Any]) -> None:
-        # Check required claims
-        required = ["iss", "sub", "jti", "exp", "iat", "trust_level"]
-        for claim in required:
-            if claim not in claims:
-                raise BadgeVerificationError(f"Missing claim: {claim}")
-        
-        # Check expiration
-        if claims["exp"] < time.time():
-            raise BadgeVerificationError("Badge expired")
-        
-        # Check trust level
-        if claims["trust_level"] < self.min_trust_level:
-            raise BadgeVerificationError(
-                f"Trust level {claims['trust_level']} below minimum {self.min_trust_level}"
-            )
-        
-        # Check DID format
-        if not claims["sub"].startswith("did:"):
-            raise BadgeVerificationError("Invalid DID format")
-```
-
-### 4. Data Models
-
-**Badge Model:**
-```python
-from dataclasses import dataclass
-from typing import Optional
-from datetime import datetime
-
-@dataclass
-class Badge:
-    issuer: str
-    subject: str  # Agent DID
-    token_id: str
-    expires_at: datetime
-    issued_at: datetime
-    not_before: Optional[datetime]
-    trust_level: int
-    ial: Optional[int] = None
-    cnf: Optional[dict] = None
-    
-    @classmethod
-    def from_claims(cls, claims: dict) -> "Badge":
-        return cls(
-            issuer=claims["iss"],
-            subject=claims["sub"],
-            token_id=claims["jti"],
-            expires_at=datetime.fromtimestamp(claims["exp"]),
-            issued_at=datetime.fromtimestamp(claims["iat"]),
-            not_before=datetime.fromtimestamp(claims["nbf"]) if "nbf" in claims else None,
-            trust_level=claims["trust_level"],
-            ial=claims.get("ial"),
-            cnf=claims.get("cnf"),
-        )
-    
-    @property
-    def is_expired(self) -> bool:
-        return datetime.now() > self.expires_at
-    
-    @property
-    def is_ial1(self) -> bool:
-        return self.ial == 1 and self.cnf is not None
-```
-
-### 5. Exception Handling
-
-**Custom Exceptions:**
-```python
-class BadgeVerificationError(Exception):
-    """Raised when badge verification fails"""
-    pass
-
-class DIDResolutionError(Exception):
-    """Raised when DID resolution fails"""
-    pass
-
-class GRPCConnectionError(Exception):
-    """Raised when gRPC connection fails"""
-    pass
-```
-
-**Usage:**
-```python
-try:
-    badge = await guard.verify(token)
-except BadgeVerificationError as e:
-    logger.error(f"Badge verification failed: {e}")
-    raise HTTPException(status_code=401, detail=str(e))
-except Exception as e:
-    logger.exception("Unexpected error during verification")
-    raise HTTPException(status_code=500, detail="Internal server error")
-```
+---
 
 ## Testing
 
-### Unit Tests
-```python
-import pytest
-from capiscio_sdk import BadgeVerifier, BadgeVerificationError
+### Running Tests
+```bash
+# Unit tests only (fast, no external deps)
+.venv/bin/python -m pytest tests/unit -v
 
-@pytest.mark.asyncio
-async def test_verify_valid_badge():
-    verifier = BadgeVerifier(
-        issuer_url="https://registry.capisc.io",
-        min_trust_level=1
-    )
-    
-    token = generate_test_badge()  # Helper function
-    
-    badge = await verifier.verify(token)
-    
-    assert badge.trust_level >= 1
-    assert badge.subject.startswith("did:")
+# Full suite (includes integration tests that need Go core)
+.venv/bin/python -m pytest -v
 
-@pytest.mark.asyncio
-async def test_verify_expired_badge():
-    verifier = BadgeVerifier(
-        issuer_url="https://registry.capisc.io",
-        min_trust_level=1
-    )
-    
-    token = generate_expired_badge()
-    
-    with pytest.raises(BadgeVerificationError, match="expired"):
-        await verifier.verify(token)
+# Coverage
+.venv/bin/python -m pytest tests/unit --cov=capiscio_sdk --cov-report=html
+
+# Specific test
+.venv/bin/python -m pytest tests/unit/test_fastapi_integration.py -v
 ```
 
-### Integration Tests
-```python
-@pytest.mark.integration
-def test_grpc_client_verify_badge():
-    client = CapiscioGRPCClient(address="localhost:50051")
-    
-    request = VerifyBadgeRequest(token=test_token)
-    response = client.verify_badge(request)
-    
-    assert response.valid
-    assert response.badge.trust_level >= 1
+### Test Structure
 ```
-
-## Common Development Tasks
+tests/
+├── unit/
+│   ├── test_events.py              # EventEmitter tests
+│   ├── test_fastapi_integration.py # CapiscioMiddleware tests (incl auto-events)
+│   ├── test_simple_guard.py        # SimpleGuard tests
+│   ├── test_config.py              # Config tests
+│   └── ...
+├── integration/
+│   ├── test_connect.py             # CapiscIO.connect() integration
+│   ├── test_process.py             # Go binary process management
+│   └── ...
+└── conftest.py
+```
 
 ### Installing
 ```bash
-# Install in development mode
-pip install -e .
-
-# Install with all extras
-pip install -e ".[dev,grpc]"
+python -m venv .venv
+.venv/bin/pip install -e ".[dev]"
 ```
 
-### Running Tests
-```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=capiscio_sdk --cov-report=html
-
-# Run specific test
-pytest tests/test_simple_guard.py -v
-```
-
-### Type Checking
-```bash
-# Run mypy
-mypy capiscio_sdk/
-
-# Run with strict mode
-mypy --strict capiscio_sdk/
-```
-
-### Linting
-```bash
-# Run ruff
-ruff check capiscio_sdk/
-
-# Auto-fix
-ruff check --fix capiscio_sdk/
-
-# Format
-ruff format capiscio_sdk/
-```
-
-## Code Quality Standards
-
-### 1. Type Hints
-```python
-# ✅ Use type hints
-async def verify(self, token: str) -> Badge:
-    pass
-
-# ❌ No type hints
-async def verify(self, token):
-    pass
-```
-
-### 2. Docstrings
-```python
-def verify_sync(self, token: str) -> Badge:
-    """Verify a badge synchronously.
-    
-    Args:
-        token: The JWS badge token
-        
-    Returns:
-        Badge: The verified badge object
-        
-    Raises:
-        BadgeVerificationError: If verification fails
-    """
-    pass
-```
-
-### 3. Async/Await
-```python
-# ✅ Use async for I/O operations
-async def fetch_jwks(self, issuer: str) -> dict:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(f"{issuer}/.well-known/jwks.json") as response:
-            return await response.json()
-
-# Also provide sync version for compatibility
-def fetch_jwks_sync(self, issuer: str) -> dict:
-    response = requests.get(f"{issuer}/.well-known/jwks.json")
-    return response.json()
-```
-
-## Common Pitfalls
-
-1. **Don't skip signature verification** - Always verify JWS
-2. **Don't accept self-signed badges in production** - Set min_trust_level >= 1
-3. **Don't cache badges forever** - Implement TTL
-4. **Don't ignore exceptions** - Handle verification errors properly
-5. **Don't log sensitive data** - Redact tokens in logs
+---
 
 ## Environment Variables
 
 ```bash
-# gRPC Client
-CAPISCIO_GRPC_ADDRESS="localhost:50051"
-CAPISCIO_GRPC_SECURE="false"
+# Connect / Registration
+CAPISCIO_API_KEY="sk_live_..."
+CAPISCIO_REGISTRY_URL="https://registry.capisc.io"
 
-# Badge Verification
-CAPISCIO_ISSUER_URL="https://registry.capisc.io"
-CAPISCIO_MIN_TRUST_LEVEL="1"
-CAPISCIO_CACHE_TTL="300"
+# SimpleGuard
+CAPISCIO_KEY_DIR="~/.capiscio/keys"
+CAPISCIO_DEV_MODE="true"
+
+# Core binary (auto-managed)
+CAPISCIO_CORE_BIN="/path/to/capiscio-core"   # Override auto-download
+CAPISCIO_CORE_PORT="50051"                    # Override gRPC port
 ```
+
+## Version Alignment
+
+This SDK MUST stay aligned with:
+- capiscio-core v2.4.0 (Go binary it wraps)
+- capiscio-server v2.4.0 (registry API it calls)
+- capiscio-python v2.4.0 (CLI wrapper that downloads core)
+- capiscio-node v2.4.0 (JS CLI wrapper)
+
+## Common Pitfalls
+
+1. **Don't bypass Go core** - All crypto must go through `CapiscioRPCClient`, never implement locally
+2. **Don't use system Python for tests** - Always use `.venv/bin/python -m pytest`
+3. **Don't manually edit `_rpc/gen/`** - These are generated protobuf stubs
+4. **Don't use deprecated `AgentCardValidator`** - Use `CoreValidator` instead
+5. **Don't make EventEmitter opt-out** - Auto-events must be opt-in (GDPR privacy-by-design)
 
 ## References
 
-- gRPC documentation: 225 lines in docs/grpc-integration.md
-- Badge verification: docs/badge-verification.md
-- DID resolution: docs/did-resolution.md
-- RFC-002: https://github.com/capiscio/capiscio-rfcs/blob/main/docs/002-trust-badge.md
-- RFC-003: https://github.com/capiscio/capiscio-rfcs/blob/main/docs/003-key-ownership-proof.md
+- RFC-002: Trust Badge Specification
+- RFC-003: Key Ownership Proof (PoP)
+- `docs/guides/configuration.md` - Full configuration guide
+- `docs/api-reference.md` - API reference
