@@ -38,6 +38,41 @@ DEFAULT_CONFIG_FILE = DEFAULT_CONFIG_DIR / "config.toml"
 PROD_REGISTRY = "https://registry.capisc.io"
 PROD_DASHBOARD = "https://app.capisc.io"
 
+# Env var for injecting the private key in ephemeral environments
+ENV_AGENT_PRIVATE_KEY = "CAPISCIO_AGENT_PRIVATE_KEY_JWK"
+
+
+# =============================================================================
+# Key injection helpers
+# =============================================================================
+
+
+def _public_jwk_from_private(private_jwk: dict) -> dict:
+    """Derive the public JWK from a private JWK (remove 'd' parameter)."""
+    public = {k: v for k, v in private_jwk.items() if k != "d"}
+    return public
+
+
+def _log_agent_key_capture_hint(agent_id: str, private_jwk: dict) -> None:
+    """Log a one-time hint telling the user how to persist key material."""
+    compact_json = json.dumps(private_jwk, separators=(",", ":"))
+    logger.warning(
+        "\n"
+        "  \u2554" + "\u2550" * 62 + "\u2557\n"
+        "  \u2551  New agent identity generated \u2014 save key for persistence   \u2551\n"
+        "  \u255a" + "\u2550" * 62 + "\u255d\n"
+        "\n"
+        "  If this agent runs in an ephemeral environment (containers,\n"
+        "  serverless, CI) the identity will be lost on restart unless\n"
+        "  you persist the private key.\n"
+        "\n"
+        "  Add to your secrets manager / .env:\n"
+        "\n"
+        "    CAPISCIO_AGENT_PRIVATE_KEY_JWK='" + compact_json + "'\n"
+        "\n"
+        "  The DID will be recovered automatically from the JWK on startup.\n"
+    )
+
 
 # =============================================================================
 # Standalone Helper Functions (for testing and direct use)
@@ -278,6 +313,8 @@ class CapiscIO:
         - CAPISCIO_AGENT_NAME (optional)
         - CAPISCIO_SERVER_URL (optional, default: production)
         - CAPISCIO_DEV_MODE (optional, default: false)
+        - CAPISCIO_AGENT_PRIVATE_KEY_JWK (optional — JSON-encoded Ed25519
+          private JWK for ephemeral environments; printed on first generation)
         """
         api_key = os.environ.get("CAPISCIO_API_KEY")
         if not api_key:
@@ -568,16 +605,44 @@ class _Connector:
         
         All cryptographic operations are performed by capiscio-core Go library.
         
-        Identity Recovery:
-        - If keys exist locally (private.jwk + public.jwk), we derive the DID
-          from public.jwk's `kid` field (per RFC-002 §6.1: did:key is self-describing)
-        - No did.txt file is required - it's redundant
-        - If server has a did:web assigned, we use that instead
+        Identity Recovery (priority order):
+        - CAPISCIO_AGENT_PRIVATE_KEY_JWK env var (ephemeral / containerised)
+        - Local keys on disk (private.jwk + public.jwk)
+        - Generate new identity via Init RPC (first run)
         """
         private_key_path = self.keys_dir / "private.jwk"
         public_key_path = self.keys_dir / "public.jwk"
-        
-        # Check if we already have keys (for idempotency)
+
+        # ------------------------------------------------------------------
+        # Source 1: Environment variable (highest priority)
+        # ------------------------------------------------------------------
+        env_jwk_raw = os.environ.get(ENV_AGENT_PRIVATE_KEY)
+        if env_jwk_raw:
+            try:
+                private_jwk = json.loads(env_jwk_raw)
+                did = private_jwk.get("kid")
+                if not did or not did.startswith("did:"):
+                    raise ValueError("JWK is missing a valid 'kid' field with a DID")
+
+                logger.info(f"Loaded agent identity from {ENV_AGENT_PRIVATE_KEY}: {did}")
+
+                # Derive public JWK and persist to disk for subsequent restarts
+                public_jwk = _public_jwk_from_private(private_jwk)
+                self.keys_dir.mkdir(parents=True, exist_ok=True)
+                private_key_path.write_text(json.dumps(private_jwk, indent=2))
+                os.chmod(private_key_path, 0o600)
+                public_key_path.write_text(json.dumps(public_jwk, indent=2))
+
+                # Register with server (idempotent)
+                server_did = self._ensure_did_registered(did, public_jwk)
+                return server_did if server_did else did
+
+            except (json.JSONDecodeError, ValueError) as e:
+                logger.error(f"Invalid {ENV_AGENT_PRIVATE_KEY}: {e} — falling through to local keys")
+
+        # ------------------------------------------------------------------
+        # Source 2: Local keys on disk
+        # ------------------------------------------------------------------
         if private_key_path.exists() and public_key_path.exists():
             logger.debug("Found existing keys - recovering identity")
             
@@ -598,8 +663,9 @@ class _Connector:
             except (json.JSONDecodeError, IOError) as e:
                 logger.warning(f"Failed to read public.jwk: {e} - regenerating")
         
-        # No valid keys exist - generate new identity via Init RPC
-        # Connect to capiscio-core gRPC
+        # ------------------------------------------------------------------
+        # Source 3: Generate new identity via Init RPC (first run)
+        # ------------------------------------------------------------------
         if not self._rpc_client:
             self._rpc_client = CapiscioRPCClient()
             self._rpc_client.connect()
@@ -625,7 +691,15 @@ class _Connector:
         logger.info(f"Identity initialized: {did}")
         if result.get("registered"):
             logger.info("DID registered with server")
-        
+
+        # Log capture hint for ephemeral environments
+        if private_key_path.exists():
+            try:
+                private_jwk = json.loads(private_key_path.read_text())
+                _log_agent_key_capture_hint(self.agent_id, private_jwk)
+            except Exception:
+                pass  # Best-effort hint
+
         return did
     
     def _ensure_did_registered(self, did: str, public_jwk: dict) -> Optional[str]:
