@@ -171,11 +171,46 @@ agent = CapiscIO.from_env()
 ```
 
 **Environment Variables:**
-- `CAPISCIO_API_KEY` (required) - Your API key
-- `CAPISCIO_AGENT_NAME` - Agent name for lookup/creation
-- `CAPISCIO_AGENT_ID` - Specific agent UUID
-- `CAPISCIO_SERVER_URL` - Registry URL
-- `CAPISCIO_DEV_MODE` - Enable dev mode (`true`/`false`)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CAPISCIO_API_KEY` | Yes | Your API key |
+| `CAPISCIO_AGENT_NAME` | No | Agent name for lookup/creation |
+| `CAPISCIO_AGENT_ID` | No | Specific agent UUID |
+| `CAPISCIO_SERVER_URL` | No | Registry URL (default: production) |
+| `CAPISCIO_DEV_MODE` | No | Enable dev mode (`true`/`false`) |
+| `CAPISCIO_AGENT_PRIVATE_KEY_JWK` | No | JSON-encoded Ed25519 private JWK for ephemeral environments |
+
+### Deploying to Containers / Serverless
+
+In ephemeral environments (Docker, Lambda, Cloud Run) the local `~/.capiscio/` directory
+doesn't survive restarts. On first run the SDK generates a keypair and logs a capture hint:
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║  New agent identity generated — save key for persistence         ║
+╚══════════════════════════════════════════════════════════════════╝
+
+  Add to your secrets manager / .env:
+
+    CAPISCIO_AGENT_PRIVATE_KEY_JWK='{"kty":"OKP","crv":"Ed25519","d":"...","x":"...","kid":"did:key:z6Mk..."}'
+```
+
+Copy that value into your secrets manager and set it as an environment variable.
+On subsequent starts the SDK recovers the same DID without generating a new identity.
+
+**Key resolution priority:** env var → local file → generate new.
+
+```yaml
+# docker-compose.yml
+services:
+  my-agent:
+    environment:
+      CAPISCIO_API_KEY: "sk_live_..."
+      CAPISCIO_AGENT_PRIVATE_KEY_JWK: "${AGENT_KEY_JWK}"  # from secrets
+```
+
+See the [Configuration Guide](https://docs.capisc.io/reference/sdk-python/config/) for full deployment examples.
 
 ## 🎯 Agent Card Validation with CoreValidator
 

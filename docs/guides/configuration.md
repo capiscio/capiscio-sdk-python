@@ -631,6 +631,8 @@ os.environ['CAPISCIO_BINARY'] = '/opt/capiscio/v2.4.0/capiscio-core'
 services:
   agent:
     environment:
+      - CAPISCIO_API_KEY=sk_live_...
+      - CAPISCIO_AGENT_PRIVATE_KEY_JWK=${AGENT_KEY_JWK}
       - CAPISCIO_FAIL_MODE=block
       - CAPISCIO_RATE_LIMITING=true
       - CAPISCIO_RATE_LIMIT_RPM=120
@@ -650,7 +652,60 @@ data:
   CAPISCIO_RATE_LIMITING: "true"
   CAPISCIO_RATE_LIMIT_RPM: "200"
   CAPISCIO_TIMEOUT_MS: "5000"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: capiscio-identity
+type: Opaque
+stringData:
+  api-key: "sk_live_..."
+  agent-private-key-jwk: '{"kty":"OKP","crv":"Ed25519","d":"...","x":"...","kid":"did:key:z6Mk..."}'
 ```
+
+### Agent Identity Variables (CapiscIO.connect)
+
+These variables are used by `CapiscIO.connect()` and `CapiscIO.from_env()` for agent identity management:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `CAPISCIO_API_KEY` | Yes | Registry API key |
+| `CAPISCIO_AGENT_NAME` | No | Agent name for lookup/creation |
+| `CAPISCIO_AGENT_ID` | No | Specific agent UUID |
+| `CAPISCIO_SERVER_URL` | No | Registry URL (default: `https://registry.capisc.io`) |
+| `CAPISCIO_DEV_MODE` | No | Enable dev mode (`true`/`false`) |
+| `CAPISCIO_AGENT_PRIVATE_KEY_JWK` | No | JSON-encoded Ed25519 private JWK for ephemeral environments |
+
+#### Ephemeral Environment Key Injection
+
+In ephemeral environments (Docker, Lambda, Cloud Run) the local `~/.capiscio/` directory doesn't survive restarts. Set `CAPISCIO_AGENT_PRIVATE_KEY_JWK` to inject the agent's Ed25519 private key from your secrets manager.
+
+**Key resolution priority:**
+
+| Priority | Source | When Used |
+|----------|--------|-----------|
+| 1 | `CAPISCIO_AGENT_PRIVATE_KEY_JWK` env var | Containers, serverless, CI |
+| 2 | Local key file (`~/.capiscio/keys/{agent_id}/private.jwk`) | Persistent environments |
+| 3 | Generate new via capiscio-core Init RPC | First run only |
+
+**First-run capture:** On the very first run, the SDK logs a capture hint to stderr with the full JWK. Copy it into your secrets manager:
+
+```
+CAPISCIO_AGENT_PRIVATE_KEY_JWK='{"kty":"OKP","crv":"Ed25519","d":"...","x":"...","kid":"did:key:z6Mk..."}'
+```
+
+!!! warning "DID Changes on New Key Generation"
+    If neither the env var nor local files are available, the SDK generates a **new** keypair with a **different** DID. Any badges issued to the old DID will no longer be valid. Always persist the key in ephemeral environments.
+
+#### Key Rotation
+
+To rotate the agent identity:
+
+1. Unset `CAPISCIO_AGENT_PRIVATE_KEY_JWK`
+2. Remove local key files (`~/.capiscio/keys/{agent_id}/`)
+3. Restart the agent — a new keypair and DID will be generated
+4. Capture the new JWK from the log hint
+5. Store the new key in your secrets manager
 
 ---
 
