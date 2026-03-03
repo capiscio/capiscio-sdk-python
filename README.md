@@ -117,7 +117,7 @@ from capiscio_sdk import CapiscIO
 agent = CapiscIO.connect(api_key="sk_live_...")
 
 # Agent is now ready
-print(agent.did)    # did:key:z6Mk...
+print(agent.did)    # did:web:registry.capisc.io:agents:...
 print(agent.badge)  # Current badge (auto-renewed)
 print(agent.name)   # Agent name
 ```
