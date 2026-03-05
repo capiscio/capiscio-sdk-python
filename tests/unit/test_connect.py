@@ -1,5 +1,6 @@
 """Unit tests for capiscio_sdk.connect module."""
 
+import importlib
 import json
 import os
 import pytest
@@ -7,7 +8,7 @@ import httpx
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import capiscio_sdk.connect as connect_module
+connect_module = importlib.import_module("capiscio_sdk.connect")
 from capiscio_sdk.connect import (
     AgentIdentity,
     CapiscIO,
@@ -932,7 +933,7 @@ class TestConnector:
             "d": "gen", "x": "gen",
         }))
 
-        with patch("capiscio_sdk.connect._log_agent_key_capture_hint") as mock_hint:
+        with patch.object(connect_module, "_log_agent_key_capture_hint") as mock_hint:
             connector._init_identity()
 
         mock_hint.assert_called_once()
@@ -961,7 +962,7 @@ class TestConnector:
         )
         connector._ensure_did_registered = MagicMock(return_value=None)
 
-        with patch("capiscio_sdk.connect._log_agent_key_capture_hint") as mock_hint:
+        with patch.object(connect_module, "_log_agent_key_capture_hint") as mock_hint:
             connector._init_identity()
 
         mock_hint.assert_not_called()
