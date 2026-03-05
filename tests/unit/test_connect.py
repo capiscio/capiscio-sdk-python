@@ -1,12 +1,14 @@
 """Unit tests for capiscio_sdk.connect module."""
 
+import importlib
+import json
 import os
 import pytest
 import httpx
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import capiscio_sdk.connect as connect_module
+connect_module = importlib.import_module("capiscio_sdk.connect")
 from capiscio_sdk.connect import (
     AgentIdentity,
     CapiscIO,
@@ -14,7 +16,10 @@ from capiscio_sdk.connect import (
     ConfigurationError,
     DEFAULT_CONFIG_DIR,
     DEFAULT_KEYS_DIR,
+    ENV_AGENT_PRIVATE_KEY,
     PROD_REGISTRY,
+    _log_agent_key_capture_hint,
+    _public_jwk_from_private,
 )
 
 
@@ -833,6 +838,134 @@ class TestConnector:
         connector._rpc_client = mock_rpc
         with pytest.raises(ConfigurationError, match="Failed to initialize identity"):
             connector._init_identity()
+
+    def test_init_identity_uses_env_var_jwk(self, tmp_path):
+        """_init_identity should load identity from CAPISCIO_AGENT_PRIVATE_KEY_JWK."""
+        private_jwk = {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "d": "nWGxne_9WmC6hEr0kuwsxERJxWl7MmkZcDusAxyuf2A",
+            "x": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+            "kid": "did:key:z6MkEnvVar",
+        }
+
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        connector._ensure_did_registered = MagicMock(return_value=None)
+
+        with patch.dict(os.environ, {ENV_AGENT_PRIVATE_KEY: json.dumps(private_jwk)}):
+            result = connector._init_identity()
+
+        assert result == "did:key:z6MkEnvVar"
+        # Should have persisted keys to disk
+        assert (tmp_path / "private.jwk").exists()
+        priv_on_disk = json.loads((tmp_path / "private.jwk").read_text())
+        assert priv_on_disk["kid"] == "did:key:z6MkEnvVar"
+        assert (tmp_path / "public.jwk").exists()
+        pub_on_disk = json.loads((tmp_path / "public.jwk").read_text())
+        assert "d" not in pub_on_disk  # public JWK must not contain private key
+
+    def test_init_identity_env_var_precedence_over_local(self, tmp_path):
+        """Env var key should override a different key on disk."""
+        # Write local keys with a different DID
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        (tmp_path / "private.jwk").write_text(json.dumps({
+            "kty": "OKP", "crv": "Ed25519", "kid": "did:key:z6MkLocal",
+            "d": "old", "x": "old",
+        }))
+        (tmp_path / "public.jwk").write_text(json.dumps({
+            "kty": "OKP", "crv": "Ed25519", "kid": "did:key:z6MkLocal",
+            "x": "old",
+        }))
+
+        env_jwk = {
+            "kty": "OKP", "crv": "Ed25519",
+            "d": "new_private", "x": "new_public",
+            "kid": "did:key:z6MkFromEnv",
+        }
+
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        connector._ensure_did_registered = MagicMock(return_value=None)
+
+        with patch.dict(os.environ, {ENV_AGENT_PRIVATE_KEY: json.dumps(env_jwk)}):
+            result = connector._init_identity()
+
+        assert result == "did:key:z6MkFromEnv"  # env var wins, not local
+
+    def test_init_identity_logs_capture_hint_on_new_gen(self, tmp_path):
+        """_init_identity should log a capture hint when generating a new identity."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+
+        mock_rpc = MagicMock()
+        mock_rpc.simpleguard.init.return_value = (
+            {"did": "did:key:z6MkNew", "registered": True},
+            None,
+        )
+        connector._rpc_client = mock_rpc
+
+        # Write the private.jwk that the RPC would create so capture-hint reads it
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        (tmp_path / "private.jwk").write_text(json.dumps({
+            "kty": "OKP", "crv": "Ed25519", "kid": "did:key:z6MkNew",
+            "d": "gen", "x": "gen",
+        }))
+
+        with patch.object(connect_module, "_log_agent_key_capture_hint") as mock_hint:
+            connector._init_identity()
+
+        mock_hint.assert_called_once()
+        assert mock_hint.call_args[0][0] == "agent-123"
+
+    def test_init_identity_no_capture_hint_on_recovery(self, tmp_path):
+        """_init_identity should NOT log a capture hint when recovering from local keys."""
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        (tmp_path / "private.jwk").write_text(json.dumps({
+            "kty": "OKP", "crv": "Ed25519", "kid": "did:key:z6MkExisting",
+            "d": "priv", "x": "pub",
+        }))
+        (tmp_path / "public.jwk").write_text(json.dumps({
+            "kty": "OKP", "crv": "Ed25519", "kid": "did:key:z6MkExisting",
+            "x": "pub",
+        }))
+
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=False,
+            dev_mode=False,
+        )
+        connector._ensure_did_registered = MagicMock(return_value=None)
+
+        with patch.object(connect_module, "_log_agent_key_capture_hint") as mock_hint:
+            connector._init_identity()
+
+        mock_hint.assert_not_called()
 
     def test_setup_badge_success(self, tmp_path):
         """Test _setup_badge sets up keeper and guard."""
