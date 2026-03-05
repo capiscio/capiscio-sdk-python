@@ -1,12 +1,12 @@
-# CapiscIO SDK (Python)
+# CapiscIO Agent Guard
 
-**Enforcement-First Security for A2A Agents.**
+Runtime identity and trust enforcement for A2A agents.
 
 [![PyPI version](https://badge.fury.io/py/capiscio-sdk.svg)](https://badge.fury.io/py/capiscio-sdk)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-**CapiscIO** is the "Customs Officer" for your AI Agent. It provides military-grade Identity and Integrity enforcement for the [Agent-to-Agent (A2A) Protocol](https://github.com/google/A2A) with **zero configuration**.
+**Agent Guard** is the CapiscIO runtime SDK for [A2A Protocol](https://github.com/google/A2A) agents. It provides identity management, request signing, badge verification, and trust enforcement with **zero configuration**.
 
 ## 🚀 The 60-Second Upgrade
 
