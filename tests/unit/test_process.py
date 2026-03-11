@@ -186,16 +186,18 @@ class TestProcessManager:
                     mock_stream.assert_not_called()
                     assert result == mock_path
 
+    @patch("capiscio_sdk._rpc.process.time.sleep")
     @patch("httpx.stream")
-    def test_download_binary_http_error(self, mock_stream):
-        """Test download handles HTTP errors."""
+    def test_download_binary_http_error(self, mock_stream, mock_sleep):
+        """Test download handles HTTP errors with retries."""
         pm = ProcessManager()
         
         with patch("capiscio_sdk._rpc.process.platform.system", return_value="Linux"):
             with patch("capiscio_sdk._rpc.process.platform.machine", return_value="x86_64"):
                 with patch.object(ProcessManager, "_get_cached_binary_path") as mock_cached:
                     mock_path = MagicMock()
-                    mock_path.exists.side_effect = [False, False]  # Not exists before download, not exists after cleanup
+                    # exists() called: once before loop, then once per attempt for cleanup
+                    mock_path.exists.return_value = False
                     mock_path.parent = MagicMock()
                     mock_cached.return_value = mock_path
                     
