@@ -44,6 +44,8 @@ class SimpleGuard:
         rpc_address: Optional[str] = None,
         agent_id: Optional[str] = None,
         badge_token: Optional[str] = None,
+        signing_kid: Optional[str] = None,
+        keys_preloaded: bool = False,
     ) -> None:
         """
         Initialize SimpleGuard.
@@ -54,12 +56,17 @@ class SimpleGuard:
             rpc_address: gRPC server address. If None, auto-starts local server.
             agent_id: Explicit agent DID. If None:
                 - In dev_mode: Auto-generates did:key from keypair
-                - Otherwise: Loaded from agent-card.json
+                - Otherwise: Loaded from agent-card.json (deprecated)
             badge_token: Pre-obtained badge token to use for identity. When set,
                 make_headers() will use this token instead of signing.
+            signing_kid: Explicit key ID for signing. When provided with agent_id,
+                skips agent-card.json entirely.
+            keys_preloaded: If True, skip file-based key loading (keys already
+                loaded in gRPC server, e.g. from CapiscIO.connect()).
         """
         self.dev_mode = dev_mode
         self._explicit_agent_id = agent_id
+        self._explicit_signing_kid = signing_kid
         self._badge_token = badge_token
         
         # 1. Safety Check
@@ -69,26 +76,29 @@ class SimpleGuard:
                 "This is insecure! Disable dev_mode in production."
             )
 
-        # 2. Resolve base_dir
+        # 2. Resolve base_dir (skip walking for agent-card.json when identity params provided)
         self.project_root = self._resolve_project_root(base_dir)
         self.keys_dir = self.project_root / "capiscio_keys"
         self.trusted_dir = self.keys_dir / "trusted"
-        self.agent_card_path = self.project_root / "agent-card.json"
         
         # 3. Connect to gRPC server
         self._client = CapiscioRPCClient(address=rpc_address)
         self._client.connect()
         
-        # 4. Load or generate agent identity
+        # 4. Resolve agent identity
         self.agent_id: str
         self.signing_kid: str
-        self._load_or_generate_card()
+        self._resolve_identity()
         
         # 5. Load or generate keys via gRPC (may update agent_id with did:key)
-        self._load_or_generate_keys()
+        if not keys_preloaded:
+            self._load_or_generate_keys()
+        else:
+            logger.info(f"Keys preloaded in gRPC server, skipping file-based key loading")
         
         # 6. Load trust store
-        self._setup_trust_store()
+        if not keys_preloaded:
+            self._setup_trust_store()
 
     def sign_outbound(self, payload: Dict[str, Any], body: Optional[bytes] = None) -> str:
         """
@@ -201,8 +211,16 @@ class SimpleGuard:
         self.close()
 
     def _resolve_project_root(self, base_dir: Optional[Union[str, Path]]) -> Path:
-        """Walk up the directory tree to find agent-card.json or stop at root."""
+        """Resolve the project root directory.
+        
+        When agent_id is provided explicitly, uses base_dir (or cwd) directly
+        without walking up the tree looking for agent-card.json.
+        """
         current = Path(base_dir or os.getcwd()).resolve()
+        
+        # When identity params are provided, don't walk looking for agent-card.json
+        if self._explicit_agent_id:
+            return current
         
         search_path = current
         while search_path != search_path.parent:
@@ -212,18 +230,31 @@ class SimpleGuard:
         
         return current
 
-    def _load_or_generate_card(self) -> None:
-        """Load agent-card.json or generate a minimal one in dev_mode."""
-        # If explicit agent_id was provided, use it
+    def _resolve_identity(self) -> None:
+        """Resolve agent identity from explicit params, agent-card.json (legacy), or dev defaults.
+        
+        Priority order:
+        1. Explicit agent_id + signing_kid params (preferred — no file needed)
+        2. Explicit agent_id only (signing_kid defaults to "key-0")
+        3. Legacy agent-card.json file (deprecated)
+        4. Dev mode auto-generation
+        """
+        # Case 1 & 2: Explicit agent_id provided
         if self._explicit_agent_id:
             self.agent_id = self._explicit_agent_id
-            self.signing_kid = "key-0"  # Will be updated when keys are generated/loaded
+            self.signing_kid = self._explicit_signing_kid or "key-0"
             logger.info(f"Using explicit agent_id: {self.agent_id}")
             return
-            
-        if self.agent_card_path.exists():
+        
+        # Case 3: Legacy agent-card.json (deprecated path)
+        agent_card_path = self.project_root / "agent-card.json"
+        if agent_card_path.exists():
+            logger.warning(
+                "Loading identity from agent-card.json is deprecated. "
+                "Pass agent_id and signing_kid to SimpleGuard() directly."
+            )
             try:
-                with open(self.agent_card_path, "r") as f:
+                with open(agent_card_path, "r") as f:
                     data = json.load(f)
                     self.agent_id = data.get("agent_id")
                     keys = data.get("public_keys", [])
@@ -233,15 +264,25 @@ class SimpleGuard:
                     
                     if not self.agent_id or not self.signing_kid:
                         raise ConfigurationError("agent-card.json missing 'agent_id' or 'public_keys[0].kid'.")
+            except ConfigurationError:
+                raise
             except Exception as e:
                 raise ConfigurationError(f"Failed to load agent-card.json: {e}")
-        elif self.dev_mode:
+            return
+            
+        # Case 4: Dev mode — placeholder until key generation
+        if self.dev_mode:
             logger.info("Dev Mode: Will generate did:key identity from keypair")
-            # Placeholder - will be updated with did:key after key generation
-            self.agent_id = "local-dev-agent"  # Temporary, replaced in _load_or_generate_keys
+            self.agent_id = "local-dev-agent"
             self.signing_kid = "local-dev-key"
-        else:
-            raise ConfigurationError(f"agent-card.json not found at {self.project_root}")
+            return
+        
+        raise ConfigurationError(
+            "No agent identity configured. Either:\n"
+            "  - Pass agent_id (and optionally signing_kid) to SimpleGuard()\n"
+            "  - Use dev_mode=True for auto-generated identity\n"
+            "  - Use CapiscIO.connect() which handles identity automatically"
+        )
 
     def _load_or_generate_keys(self) -> None:
         """Load keys or generate them in dev_mode via gRPC.
@@ -290,38 +331,8 @@ class SimpleGuard:
             # Save public key
             with open(public_key_path, "w") as f:
                 f.write(key_info["public_key_pem"])
-            
-            # Update agent-card.json with JWK
-            self._update_agent_card_with_pem(key_info["public_key_pem"])
         else:
             raise ConfigurationError(f"private.pem not found at {private_key_path}")
-
-    def _update_agent_card_with_pem(self, public_key_pem: str) -> None:
-        """Helper to write agent-card.json with the generated key."""
-        # For simplicity, just create a minimal card
-        # In production, would convert PEM to JWK
-        card_data = {
-            "agent_id": self.agent_id,
-            "public_keys": [{
-                "kty": "OKP",
-                "crv": "Ed25519",
-                "kid": self.signing_kid,
-                "use": "sig",
-                # Note: x would need to be extracted from PEM
-            }],
-            "protocolVersion": "0.3.0",
-            "name": "Local Dev Agent",
-            "description": "Auto-generated by SimpleGuard",
-            "url": "http://localhost:8000",
-            "version": "0.1.0",
-            "provider": {
-                "organization": "Local Dev"
-            }
-        }
-        
-        with open(self.agent_card_path, "w") as f:
-            json.dump(card_data, f, indent=2)
-        logger.info(f"Created agent-card.json at {self.agent_card_path}")
 
     def _setup_trust_store(self) -> None:
         """Ensure trust store exists and add self-trust in dev_mode."""

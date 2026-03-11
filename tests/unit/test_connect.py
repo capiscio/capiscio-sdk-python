@@ -978,6 +978,7 @@ class TestConnector:
             auto_badge=True,
             dev_mode=False,
         )
+        connector.did = "did:key:z6Mktest"
         
         mock_keeper = MagicMock()
         mock_keeper.get_current_badge.return_value = "badge-jwt"

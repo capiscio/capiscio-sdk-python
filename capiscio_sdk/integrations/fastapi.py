@@ -1,5 +1,5 @@
 """FastAPI integration for Capiscio SimpleGuard."""
-from typing import Callable, Awaitable, Any, Dict, List, Optional, TYPE_CHECKING
+from typing import Callable, Awaitable, Any, Dict, List, Optional, Union, TYPE_CHECKING
 try:
     from starlette.middleware.base import BaseHTTPMiddleware
     from starlette.requests import Request
@@ -25,7 +25,9 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
     
     Args:
         app: The ASGI application.
-        guard: SimpleGuard instance for verification.
+        guard: SimpleGuard instance, or a callable returning one (for lazy binding).
+            When a callable is provided, the guard is resolved on first request.
+            This allows registering middleware at module level before connect() runs.
         exclude_paths: List of paths to skip verification (e.g., ["/health", "/.well-known/agent-card.json"]).
         config: Optional SecurityConfig to control enforcement behavior.
         emitter: Optional EventEmitter for auto-event emission. When provided,
@@ -42,14 +44,20 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
     def __init__(
         self, 
         app: ASGIApp, 
-        guard: SimpleGuard, 
+        guard: Union[SimpleGuard, Callable[[], Optional[SimpleGuard]], None] = None, 
         exclude_paths: Optional[List[str]] = None,
         *,  # Force config to be keyword-only
         config: Optional["SecurityConfig"] = None,
         emitter: Optional[EventEmitter] = None,
     ) -> None:
         super().__init__(app)
-        self.guard = guard
+        self._guard_factory: Optional[Callable[[], Optional[SimpleGuard]]] = None
+        # Treat as factory only if it's a plain function/lambda (not a guard-like object)
+        if guard is not None and callable(guard) and not hasattr(guard, 'verify_inbound'):
+            self._guard_factory = guard
+            self._guard: Optional[SimpleGuard] = None
+        else:
+            self._guard = guard
         self.config = config
         self.exclude_paths = exclude_paths or []
         self._emitter = emitter
@@ -59,6 +67,21 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
         self.fail_mode = config.fail_mode if config is not None else "block"
         
         logger.info(f"CapiscioMiddleware initialized: exclude_paths={self.exclude_paths}, require_signatures={self.require_signatures}, fail_mode={self.fail_mode}, auto_events={emitter is not None}")
+
+    @property
+    def guard(self) -> Optional[SimpleGuard]:
+        """Resolve guard lazily if a factory was provided."""
+        if self._guard is None and self._guard_factory is not None:
+            self._guard = self._guard_factory()
+        return self._guard
+    
+    def set_guard(self, guard: SimpleGuard) -> None:
+        """Set or replace the guard instance after construction.
+        
+        Useful for binding the guard in a lifespan handler after connect().
+        """
+        self._guard = guard
+        self._guard_factory = None
 
     async def dispatch(
         self, 
@@ -74,6 +97,13 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
         logger.debug(f"CapiscioMiddleware: path={path!r}, exclude_paths={self.exclude_paths}, match={path in self.exclude_paths}")
         if path in self.exclude_paths:
             logger.debug(f"CapiscioMiddleware: SKIPPING verification for {path}")
+            return await call_next(request)
+
+        # If guard is not yet bound (lazy binding), pass through as unverified
+        if self.guard is None:
+            logger.debug("CapiscioMiddleware: guard not yet bound, passing through as unverified")
+            request.state.agent = None
+            request.state.agent_id = None
             return await call_next(request)
 
         request_start = time.perf_counter()
