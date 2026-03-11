@@ -1,5 +1,6 @@
 """gRPC client wrapper for capiscio-core."""
 
+import sys
 from typing import Generator, Optional
 
 import grpc
@@ -95,7 +96,10 @@ class CapiscioRPCClient:
             self._process_manager = get_process_manager()
             address = self._process_manager.ensure_running(timeout=timeout)
         elif address is None:
-            address = "unix:///tmp/capiscio.sock"
+            if sys.platform == "win32":
+                address = "localhost:50051"
+            else:
+                address = "unix:///tmp/capiscio.sock"
         
         # Create channel
         if address.startswith("unix://"):
