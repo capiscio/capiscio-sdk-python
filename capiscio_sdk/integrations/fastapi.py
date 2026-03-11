@@ -52,8 +52,9 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
     ) -> None:
         super().__init__(app)
         self._guard_factory: Optional[Callable[[], Optional[SimpleGuard]]] = None
-        # Treat as factory only if it's a plain function/lambda (not a guard-like object)
-        if guard is not None and callable(guard) and not hasattr(guard, 'verify_inbound'):
+        # Treat as factory if it's a plain callable without guard interface,
+        # OR if it's a class/type (e.g. passing SimpleGuard itself, not an instance)
+        if guard is not None and callable(guard) and (isinstance(guard, type) or not hasattr(guard, 'verify_inbound')):
             self._guard_factory = guard
             self._guard: Optional[SimpleGuard] = None
         else:
@@ -99,12 +100,21 @@ class CapiscioMiddleware(BaseHTTPMiddleware):
             logger.debug(f"CapiscioMiddleware: SKIPPING verification for {path}")
             return await call_next(request)
 
-        # If guard is not yet bound (lazy binding), pass through as unverified
+        # If guard is not yet bound (lazy binding), fail closed to avoid unverified access
         if self.guard is None:
-            logger.debug("CapiscioMiddleware: guard not yet bound, passing through as unverified")
+            logger.error("CapiscioMiddleware: guard not bound or unavailable; blocking request")
             request.state.agent = None
             request.state.agent_id = None
-            return await call_next(request)
+            self._auto_emit(EventEmitter.EVENT_VERIFICATION_FAILED, {
+                "method": request.method,
+                "path": path,
+                "reason": "guard_unavailable",
+                "duration_ms": 0.0,
+            })
+            return JSONResponse(
+                {"error": "CapiscIO guard is not available. Requests cannot be verified at this time."},
+                status_code=503,
+            )
 
         request_start = time.perf_counter()
 

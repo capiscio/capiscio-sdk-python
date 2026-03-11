@@ -808,7 +808,7 @@ class _Connector:
             # Set up SimpleGuard — keys are already loaded in gRPC server
             # from _init_identity(), so skip file-based PEM loading
             guard = SimpleGuard(
-                agent_id=self.agent_id,
+                agent_id=self.did,
                 dev_mode=self.dev_mode,
                 signing_kid=self.did,
                 keys_preloaded=True,

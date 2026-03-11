@@ -455,7 +455,7 @@ class TestLazyGuardBinding:
         assert response.json()["agent_id"] == "did:key:caller"
     
     def test_middleware_with_none_guard_passes_through(self):
-        """Test that None guard passes requests through as unverified."""
+        """Test that None guard returns 503 (fail closed)."""
         app = FastAPI()
         app.add_middleware(
             CapiscioMiddleware,
@@ -472,13 +472,11 @@ class TestLazyGuardBinding:
         
         client = TestClient(app)
         response = client.post("/test", json={})
-        assert response.status_code == 200
-        data = response.json()
-        assert data["agent"] is None
-        assert data["agent_id"] is None
+        assert response.status_code == 503
+        assert "guard is not available" in response.json()["error"]
     
     def test_middleware_callable_returning_none(self):
-        """Test that callable returning None (guard not ready) passes through."""
+        """Test that callable returning None (guard not ready) returns 503."""
         app = FastAPI()
         app.add_middleware(
             CapiscioMiddleware,
@@ -495,10 +493,8 @@ class TestLazyGuardBinding:
         
         client = TestClient(app)
         response = client.post("/test", json={})
-        assert response.status_code == 200
-        data = response.json()
-        assert data["agent"] is None
-        assert data["agent_id"] is None
+        assert response.status_code == 503
+        assert "guard is not available" in response.json()["error"]
 
 
 class TestAutoEvents:
