@@ -299,15 +299,19 @@ class ProcessManager:
             addr = f"unix://{self._socket_path}"
             deadline = time.time() + remaining
             while time.time() < deadline:
+                time_left = deadline - time.time()
+                if time_left <= 0:
+                    break
+                channel = grpc.insecure_channel(addr)
                 try:
-                    channel = grpc.insecure_channel(addr)
-                    grpc.channel_ready_future(channel).result(timeout=min(1.0, remaining))
-                    channel.close()
+                    grpc.channel_ready_future(channel).result(timeout=min(1.0, time_left))
                     break
                 except grpc.FutureTimeoutError:
-                    pass
+                    time.sleep(0.1)
                 except Exception:
                     time.sleep(0.1)
+                finally:
+                    channel.close()
             else:
                 self.stop()
                 raise RuntimeError(
