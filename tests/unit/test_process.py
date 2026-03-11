@@ -3,6 +3,7 @@
 import os
 import platform
 import pytest
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch, mock_open
 
@@ -216,3 +217,90 @@ class TestProcessManager:
         # Just verify the method exists and can be mocked for integration
         assert hasattr(pm, "_download_binary")
         assert callable(pm._download_binary)
+
+    def test_find_free_port(self):
+        """Test that _find_free_port returns a valid port number."""
+        port = ProcessManager._find_free_port()
+        assert isinstance(port, int)
+        assert 1 <= port <= 65535
+
+    def test_ensure_running_delegates_to_tcp_on_windows(self):
+        """Test ensure_running uses TCP when sys.platform is win32."""
+        pm = ProcessManager()
+        mock_binary = MagicMock()
+
+        with patch.object(pm, "find_binary", return_value=mock_binary):
+            with patch("capiscio_sdk._rpc.process.sys.platform", "win32"):
+                with patch.object(pm, "_start_tcp", return_value="localhost:9999") as mock_tcp:
+                    result = pm.ensure_running()
+                    mock_tcp.assert_called_once_with(mock_binary, 5.0)
+                    assert result == "localhost:9999"
+
+    def test_ensure_running_delegates_to_unix_socket_on_posix(self):
+        """Test ensure_running uses Unix socket when not on Windows."""
+        pm = ProcessManager()
+        mock_binary = MagicMock()
+
+        with patch.object(pm, "find_binary", return_value=mock_binary):
+            with patch("capiscio_sdk._rpc.process.sys.platform", "darwin"):
+                with patch.object(
+                    pm, "_start_unix_socket", return_value="unix:///tmp/test.sock"
+                ) as mock_unix:
+                    result = pm.ensure_running()
+                    mock_unix.assert_called_once_with(mock_binary, None, 5.0)
+                    assert result == "unix:///tmp/test.sock"
+
+    def test_start_tcp_spawns_with_address_flag(self):
+        """Test _start_tcp spawns the binary with --address flag."""
+        pm = ProcessManager()
+        mock_binary = Path("/tmp/capiscio")
+
+        with patch.object(ProcessManager, "_find_free_port", return_value=54321):
+            with patch("subprocess.Popen") as mock_popen:
+                mock_proc = MagicMock()
+                mock_proc.poll.return_value = None
+                mock_popen.return_value = mock_proc
+
+                with patch.object(pm, "_wait_grpc_ready"):
+                    pm._start_tcp(mock_binary, timeout=5.0)
+
+                # Verify it used --address, not --socket
+                call_args = mock_popen.call_args
+                cmd = call_args[0][0]
+                assert cmd == ["/tmp/capiscio", "rpc", "--address", "localhost:54321"]
+                assert pm._tcp_address == "localhost:54321"
+
+    def test_start_tcp_uses_platform_appropriate_process_isolation(self):
+        """Test _start_tcp uses correct process isolation per platform."""
+        pm = ProcessManager()
+        mock_binary = Path("/tmp/capiscio")
+
+        with patch.object(ProcessManager, "_find_free_port", return_value=12345):
+            with patch("subprocess.Popen") as mock_popen:
+                mock_proc = MagicMock()
+                mock_proc.poll.return_value = None
+                mock_popen.return_value = mock_proc
+
+                with patch.object(pm, "_wait_grpc_ready"):
+                    pm._start_tcp(mock_binary, timeout=5.0)
+
+                call_kwargs = mock_popen.call_args[1]
+                if sys.platform == "win32":
+                    import subprocess
+                    assert call_kwargs["creationflags"] == subprocess.CREATE_NEW_PROCESS_GROUP
+                else:
+                    assert call_kwargs["start_new_session"] is True
+
+    def test_address_property_returns_tcp_when_set(self):
+        """Test address property returns TCP address when set."""
+        pm = ProcessManager()
+        pm._tcp_address = "localhost:50051"
+        assert pm.address == "localhost:50051"
+
+    def test_address_property_returns_unix_by_default(self):
+        """Test address property returns Unix socket by default."""
+        pm = ProcessManager()
+        pm._tcp_address = None
+        pm._socket_path = None
+        from capiscio_sdk._rpc.process import DEFAULT_SOCKET_PATH
+        assert pm.address == f"unix://{DEFAULT_SOCKET_PATH}"

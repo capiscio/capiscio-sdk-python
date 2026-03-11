@@ -5,6 +5,7 @@ import logging
 import os
 import platform
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -245,6 +246,40 @@ class ProcessManager:
             binary = self._download_binary()
         self._binary_path = binary
         
+        # Windows doesn't support Unix sockets — use TCP instead
+        if sys.platform == "win32":
+            return self._start_tcp(binary, timeout)
+        else:
+            return self._start_unix_socket(binary, socket_path, timeout)
+
+    def _start_tcp(self, binary: Path, timeout: float) -> str:
+        """Start the gRPC server with a TCP listener (used on Windows)."""
+        port = self._find_free_port()
+        addr = f"localhost:{port}"
+        cmd = [str(binary), "rpc", "--address", addr]
+
+        try:
+            popen_kwargs = {
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.PIPE,
+            }
+            if sys.platform == "win32":
+                popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+            else:
+                popen_kwargs["start_new_session"] = True
+            self._process = subprocess.Popen(cmd, **popen_kwargs)
+        except Exception as e:
+            raise RuntimeError(f"Failed to start capiscio server: {e}") from e
+
+        self._tcp_address = addr
+        self._wait_grpc_ready(addr, timeout)
+        self._started = True
+        return self.address
+
+    def _start_unix_socket(
+        self, binary: Path, socket_path: Optional[Path], timeout: float
+    ) -> str:
+        """Start the gRPC server with a Unix socket listener."""
         # Set up socket path
         self._socket_path = socket_path or DEFAULT_SOCKET_PATH
         
@@ -268,7 +303,7 @@ class ProcessManager:
         except Exception as e:
             raise RuntimeError(f"Failed to start capiscio server: {e}") from e
         
-        # Wait for socket to appear
+        # Wait for socket file to appear
         start_time = time.time()
         while time.time() - start_time < timeout:
             if self._socket_path.exists():
@@ -294,33 +329,50 @@ class ProcessManager:
         
         # Socket exists — verify gRPC is actually accepting connections
         remaining = timeout - (time.time() - start_time)
-        if remaining > 0:
-            import grpc
-            addr = f"unix://{self._socket_path}"
-            deadline = time.time() + remaining
-            while time.time() < deadline:
-                time_left = deadline - time.time()
-                if time_left <= 0:
-                    break
-                channel = grpc.insecure_channel(addr)
-                try:
-                    grpc.channel_ready_future(channel).result(timeout=min(1.0, time_left))
-                    break
-                except grpc.FutureTimeoutError:
-                    time.sleep(0.1)
-                except Exception:
-                    time.sleep(0.1)
-                finally:
-                    channel.close()
-            else:
-                self.stop()
-                raise RuntimeError(
-                    f"capiscio server socket appeared but gRPC not ready "
-                    f"within {timeout}s at {self._socket_path}"
-                )
-        
+        addr = f"unix://{self._socket_path}"
+        self._wait_grpc_ready(addr, remaining)
         self._started = True
         return self.address
+
+    @staticmethod
+    def _find_free_port() -> int:
+        """Find a free TCP port by binding to port 0."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("", 0))
+            return s.getsockname()[1]
+
+    def _wait_grpc_ready(self, addr: str, remaining: float) -> None:
+        """Wait for the gRPC server to accept connections."""
+        if remaining <= 0:
+            return
+        import grpc
+        deadline = time.time() + remaining
+        while time.time() < deadline:
+            # Check if process died
+            if self._process is not None and self._process.poll() is not None:
+                stdout, stderr = self._process.communicate()
+                raise RuntimeError(
+                    f"capiscio server exited unexpectedly:\n"
+                    f"stdout: {stdout.decode()}\n"
+                    f"stderr: {stderr.decode()}"
+                )
+            time_left = deadline - time.time()
+            if time_left <= 0:
+                break
+            channel = grpc.insecure_channel(addr)
+            try:
+                grpc.channel_ready_future(channel).result(timeout=min(1.0, time_left))
+                return
+            except grpc.FutureTimeoutError:
+                time.sleep(0.1)
+            except Exception:
+                time.sleep(0.1)
+            finally:
+                channel.close()
+        self.stop()
+        raise RuntimeError(
+            f"capiscio server gRPC not ready within timeout at {addr}"
+        )
     
     def stop(self) -> None:
         """Stop the gRPC server process."""
