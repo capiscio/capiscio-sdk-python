@@ -428,6 +428,75 @@ class TestSecurityConfigIntegration:
         assert data["agent_id"] is None
 
 
+class TestLazyGuardBinding:
+    """Tests for lazy guard binding (callable and set_guard)."""
+    
+    def test_middleware_with_callable_guard(self):
+        """Test that guard can be a callable that returns the SimpleGuard."""
+        mock_guard = MagicMock()
+        mock_guard.agent_id = "test-agent"
+        mock_guard.verify_inbound.return_value = {"iss": "did:key:caller", "sub": "test"}
+        
+        app = FastAPI()
+        app.add_middleware(
+            CapiscioMiddleware,
+            guard=lambda: mock_guard,
+            exclude_paths=["/health"],
+        )
+        
+        @app.post("/test")
+        async def test_endpoint(request: Request):
+            return {"agent_id": getattr(request.state, 'agent_id', None)}
+        
+        client = TestClient(app)
+        headers = {"X-Capiscio-Badge": "mock.jws.token", "Content-Type": "application/json"}
+        response = client.post("/test", json={}, headers=headers)
+        assert response.status_code == 200
+        assert response.json()["agent_id"] == "did:key:caller"
+    
+    def test_middleware_with_none_guard_passes_through(self):
+        """Test that None guard returns 503 (fail closed)."""
+        app = FastAPI()
+        app.add_middleware(
+            CapiscioMiddleware,
+            guard=None,
+            exclude_paths=["/health"],
+        )
+        
+        @app.post("/test")
+        async def test_endpoint(request: Request):
+            return {
+                "agent": getattr(request.state, 'agent', 'not-set'),
+                "agent_id": getattr(request.state, 'agent_id', 'not-set'),
+            }
+        
+        client = TestClient(app)
+        response = client.post("/test", json={})
+        assert response.status_code == 503
+        assert "guard is not available" in response.json()["error"]
+    
+    def test_middleware_callable_returning_none(self):
+        """Test that callable returning None (guard not ready) returns 503."""
+        app = FastAPI()
+        app.add_middleware(
+            CapiscioMiddleware,
+            guard=lambda: None,
+            exclude_paths=["/health"],
+        )
+        
+        @app.post("/test")
+        async def test_endpoint(request: Request):
+            return {
+                "agent": getattr(request.state, 'agent', 'not-set'),
+                "agent_id": getattr(request.state, 'agent_id', 'not-set'),
+            }
+        
+        client = TestClient(app)
+        response = client.post("/test", json={})
+        assert response.status_code == 503
+        assert "guard is not available" in response.json()["error"]
+
+
 class TestAutoEvents:
     """Tests for middleware auto-event emission."""
 

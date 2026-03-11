@@ -398,6 +398,7 @@ class _Connector:
             # Step 3: Initialize identity via capiscio-core Init RPC (one call does everything)
             # If keys already exist locally, we recover the DID without calling core.
             did = self._init_identity()
+            self.did = did
             logger.info(f"DID: {did}")
             
             # Step 3.5: Activate agent on server
@@ -804,11 +805,13 @@ class _Connector:
             from .badge_keeper import BadgeKeeper
             from .simple_guard import SimpleGuard
             
-            # Set up SimpleGuard with correct parameters
+            # Set up SimpleGuard — keys are already loaded in gRPC server
+            # from _init_identity(), so skip file-based PEM loading
             guard = SimpleGuard(
-                base_dir=str(self.keys_dir.parent),
-                agent_id=self.agent_id,
+                agent_id=self.did,
                 dev_mode=self.dev_mode,
+                signing_kid=self.did,
+                keys_preloaded=True,
             )
             
             # Set up BadgeKeeper with correct parameters

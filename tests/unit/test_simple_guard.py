@@ -60,26 +60,47 @@ class TestSimpleGuardInitialization:
         
         guard.close()
 
-    def test_dev_mode_creates_agent_card(self, temp_workspace, mock_rpc_client):
-        """Test that dev_mode creates agent-card.json."""
+    def test_dev_mode_generates_keys_without_agent_card(self, temp_workspace, mock_rpc_client):
+        """Test that dev_mode generates keys but does NOT create agent-card.json."""
         guard = SimpleGuard(dev_mode=True)
         
-        assert (temp_workspace / "agent-card.json").exists()
+        # Keys are generated via gRPC
+        mock_rpc_client.simpleguard.generate_key_pair.assert_called_once()
         
-        card = json.loads((temp_workspace / "agent-card.json").read_text())
-        assert "agent_id" in card
-        assert "public_keys" in card
+        # agent-card.json should NOT be created (eliminated as dead weight)
+        assert not (temp_workspace / "agent-card.json").exists()
         
         guard.close()
 
     def test_production_mode_requires_config(self, temp_workspace, mock_rpc_client):
         """Test that production mode fails without existing config."""
-        with pytest.raises(ConfigurationError):
+        with pytest.raises(ConfigurationError, match="No agent identity configured"):
             SimpleGuard(dev_mode=False)
 
-    def test_production_mode_with_existing_card(self, temp_workspace, mock_rpc_client):
-        """Test that production mode works with existing config."""
-        # Create agent-card.json
+    def test_explicit_agent_id_and_signing_kid(self, temp_workspace, mock_rpc_client):
+        """Test that explicit agent_id + signing_kid skips agent-card.json entirely."""
+        keys_dir = temp_workspace / "capiscio_keys"
+        keys_dir.mkdir()
+        (keys_dir / "private.pem").write_text("mock key")
+        
+        guard = SimpleGuard(
+            agent_id="did:web:example.com:agents:test",
+            signing_kid="key-1",
+            dev_mode=False,
+        )
+        assert guard.agent_id == "did:web:example.com:agents:test"
+        assert guard.signing_kid == "test-key"  # Updated by load_key
+        
+        # No agent-card.json needed
+        assert not (temp_workspace / "agent-card.json").exists()
+        
+        guard.close()
+
+    def test_legacy_agent_card_with_deprecation_warning(self, temp_workspace, mock_rpc_client, caplog):
+        """Test that loading from agent-card.json works but logs deprecation warning."""
+        import logging
+        
+        # Create legacy agent-card.json
         card = {
             "agent_id": "my-agent",
             "public_keys": [{"kid": "my-key", "kty": "OKP", "crv": "Ed25519"}],
@@ -91,8 +112,11 @@ class TestSimpleGuardInitialization:
         keys_dir.mkdir()
         (keys_dir / "private.pem").write_text("mock key")
         
-        guard = SimpleGuard(dev_mode=False)
+        with caplog.at_level(logging.WARNING):
+            guard = SimpleGuard(dev_mode=False)
+        
         assert guard.agent_id == "my-agent"
+        assert "deprecated" in caplog.text.lower()
         
         guard.close()
 
