@@ -273,6 +273,7 @@ class ProcessManager:
 
         self._tcp_address = addr
         self._wait_grpc_ready(addr, timeout)
+        self._drain_pipes()
         self._started = True
         return self.address
 
@@ -312,10 +313,11 @@ class ProcessManager:
             # Check if process died
             if self._process.poll() is not None:
                 stdout, stderr = self._process.communicate()
+                self.stop()
                 raise RuntimeError(
                     f"capiscio server exited unexpectedly:\n"
-                    f"stdout: {stdout.decode()}\n"
-                    f"stderr: {stderr.decode()}"
+                    f"stdout: {stdout.decode(errors='replace') if stdout else ''}\n"
+                    f"stderr: {stderr.decode(errors='replace') if stderr else ''}"
                 )
             
             time.sleep(0.1)
@@ -331,6 +333,7 @@ class ProcessManager:
         remaining = timeout - (time.time() - start_time)
         addr = f"unix://{self._socket_path}"
         self._wait_grpc_ready(addr, remaining)
+        self._drain_pipes()
         self._started = True
         return self.address
 
@@ -340,6 +343,14 @@ class ProcessManager:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("", 0))
             return s.getsockname()[1]
+
+    def _drain_pipes(self) -> None:
+        """Close piped stdout/stderr to prevent OS buffer fill on long-lived processes."""
+        if self._process is not None:
+            if self._process.stdout:
+                self._process.stdout.close()
+            if self._process.stderr:
+                self._process.stderr.close()
 
     def _wait_grpc_ready(self, addr: str, remaining: float) -> None:
         """Wait for the gRPC server to accept connections."""
@@ -351,10 +362,11 @@ class ProcessManager:
             # Check if process died
             if self._process is not None and self._process.poll() is not None:
                 stdout, stderr = self._process.communicate()
+                self.stop()
                 raise RuntimeError(
                     f"capiscio server exited unexpectedly:\n"
-                    f"stdout: {stdout.decode()}\n"
-                    f"stderr: {stderr.decode()}"
+                    f"stdout: {stdout.decode(errors='replace') if stdout else ''}\n"
+                    f"stderr: {stderr.decode(errors='replace') if stderr else ''}"
                 )
             time_left = deadline - time.time()
             if time_left <= 0:
