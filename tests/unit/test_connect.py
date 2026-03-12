@@ -997,6 +997,42 @@ class TestConnector:
         mock_keeper.start.assert_called_once()
         mock_keeper.get_current_badge.assert_called_once()
 
+    def test_setup_badge_wires_on_renew(self, tmp_path):
+        """Test _setup_badge wires on_renew callback to guard.set_badge_token."""
+        connector = _Connector(
+            api_key="sk_test",
+            name="Test",
+            agent_id="agent-123",
+            server_url="https://test.server.com",
+            keys_dir=tmp_path,
+            auto_badge=True,
+            dev_mode=False,
+        )
+        connector.did = "did:key:z6Mktest"
+
+        mock_keeper = MagicMock()
+        mock_keeper.get_current_badge.return_value = "badge-jwt"
+        mock_keeper.badge_expires_at = "2026-12-31T00:00:00Z"
+
+        mock_guard = MagicMock()
+
+        captured_on_renew = None
+
+        def capture_keeper_init(**kwargs):
+            nonlocal captured_on_renew
+            captured_on_renew = kwargs.get("on_renew")
+            return mock_keeper
+
+        with patch("capiscio_sdk.badge_keeper.BadgeKeeper", side_effect=capture_keeper_init):
+            with patch("capiscio_sdk.simple_guard.SimpleGuard", return_value=mock_guard):
+                connector._setup_badge()
+
+        # on_renew should have been passed to BadgeKeeper
+        assert captured_on_renew is not None
+        # Calling on_renew should forward to guard.set_badge_token
+        captured_on_renew("new-token-xyz")
+        mock_guard.set_badge_token.assert_called_once_with("new-token-xyz")
+
     def test_setup_badge_failure_continues(self, tmp_path):
         """Test _setup_badge returns None on failure without raising."""
         connector = _Connector(

@@ -815,12 +815,15 @@ class _Connector:
             )
             
             # Set up BadgeKeeper with correct parameters
+            # Wire on_renew so the guard's badge token stays in sync
+            # when the keeper renews it in the background.
             keeper = BadgeKeeper(
                 api_url=self.server_url,
                 api_key=self.api_key,
                 agent_id=self.agent_id,
                 mode="dev" if self.dev_mode else "ca",
                 output_file=str(self.keys_dir / "badge.jwt"),
+                on_renew=lambda token: guard.set_badge_token(token),
             )
             
             # Start the keeper and get initial badge
