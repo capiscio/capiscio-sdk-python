@@ -2,32 +2,28 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from capiscio_sdk.warmup import main
 
 
 class TestWarmup:
     def test_already_cached(self, tmp_path):
-        """When binary is already cached, prints 'Already cached' and returns 0."""
+        """When binary is already cached, returns 0."""
         fake_binary = tmp_path / "capiscio"
         fake_binary.write_text("#!/bin/sh\necho v2.4.0")
         fake_binary.chmod(0o755)
 
         with patch("capiscio_sdk.warmup.ProcessManager") as MockPM:
             instance = MockPM.return_value
-            instance._get_platform_info.return_value = ("darwin", "arm64")
-            instance.find_binary.return_value = fake_binary
+            instance.ensure_cached.return_value = fake_binary
             with patch("capiscio_sdk.warmup.subprocess") as mock_sub:
                 mock_sub.run.return_value = MagicMock(returncode=0, stdout="v2.4.0", stderr="")
                 mock_sub.TimeoutExpired = TimeoutError
                 result = main()
 
         assert result == 0
-        instance._download_binary.assert_not_called()
+        instance.ensure_cached.assert_called_once()
 
     def test_download_needed(self, tmp_path):
         """When binary is not cached, downloads it and returns 0."""
@@ -37,16 +33,14 @@ class TestWarmup:
 
         with patch("capiscio_sdk.warmup.ProcessManager") as MockPM:
             instance = MockPM.return_value
-            instance._get_platform_info.return_value = ("linux", "amd64")
-            instance.find_binary.return_value = None
-            instance._download_binary.return_value = fake_binary
+            instance.ensure_cached.return_value = fake_binary
             with patch("capiscio_sdk.warmup.subprocess") as mock_sub:
                 mock_sub.run.return_value = MagicMock(returncode=0, stdout="v2.4.0", stderr="")
                 mock_sub.TimeoutExpired = TimeoutError
                 result = main()
 
         assert result == 0
-        instance._download_binary.assert_called_once()
+        instance.ensure_cached.assert_called_once()
 
     def test_binary_verification_failure(self, tmp_path):
         """When binary --version returns non-zero, returns 1."""
@@ -56,8 +50,7 @@ class TestWarmup:
 
         with patch("capiscio_sdk.warmup.ProcessManager") as MockPM:
             instance = MockPM.return_value
-            instance._get_platform_info.return_value = ("darwin", "arm64")
-            instance.find_binary.return_value = fake_binary
+            instance.ensure_cached.return_value = fake_binary
             with patch("capiscio_sdk.warmup.subprocess") as mock_sub:
                 mock_sub.run.return_value = MagicMock(returncode=1, stdout="", stderr="error")
                 mock_sub.TimeoutExpired = TimeoutError
@@ -71,8 +64,7 @@ class TestWarmup:
 
         with patch("capiscio_sdk.warmup.ProcessManager") as MockPM:
             instance = MockPM.return_value
-            instance._get_platform_info.return_value = ("darwin", "arm64")
-            instance.find_binary.return_value = fake_binary
+            instance.ensure_cached.return_value = fake_binary
             with patch("capiscio_sdk.warmup.subprocess") as mock_sub:
                 mock_sub.run.side_effect = FileNotFoundError("not found")
                 mock_sub.TimeoutExpired = TimeoutError
@@ -90,11 +82,25 @@ class TestWarmup:
 
         with patch("capiscio_sdk.warmup.ProcessManager") as MockPM:
             instance = MockPM.return_value
-            instance._get_platform_info.return_value = ("darwin", "arm64")
-            instance.find_binary.return_value = fake_binary
+            instance.ensure_cached.return_value = fake_binary
             with patch("capiscio_sdk.warmup.subprocess") as mock_sub:
                 mock_sub.run.side_effect = real_subprocess.TimeoutExpired("cmd", 10)
                 mock_sub.TimeoutExpired = real_subprocess.TimeoutExpired
                 result = main()
 
         assert result == 0
+
+    def test_permission_error(self, tmp_path):
+        """When binary can't be executed due to permissions, returns 1."""
+        fake_binary = tmp_path / "capiscio"
+        fake_binary.write_text("")
+
+        with patch("capiscio_sdk.warmup.ProcessManager") as MockPM:
+            instance = MockPM.return_value
+            instance.ensure_cached.return_value = fake_binary
+            with patch("capiscio_sdk.warmup.subprocess") as mock_sub:
+                mock_sub.run.side_effect = PermissionError("Permission denied")
+                mock_sub.TimeoutExpired = TimeoutError
+                result = main()
+
+        assert result == 1

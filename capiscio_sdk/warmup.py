@@ -21,18 +21,12 @@ from capiscio_sdk._rpc.process import CORE_VERSION, ProcessManager
 def main() -> int:
     """Download and verify the capiscio-core binary, then exit."""
     manager = ProcessManager()
-    os_name, arch_name = manager._get_platform_info()
 
-    print(f"capiscio-core v{CORE_VERSION} for {os_name}-{arch_name}")
+    print(f"capiscio-core v{CORE_VERSION}")
 
-    # Check if already cached
-    binary = manager.find_binary()
-    if binary is not None:
-        print(f"  Already cached: {binary}")
-    else:
-        # Download it
-        binary = manager._download_binary()
-        print(f"  Cached at: {binary}")
+    # Ensure binary is in the versioned cache (~/.capiscio/bin/<version>/)
+    binary = manager.ensure_cached()
+    print(f"  Binary path: {binary}")
 
     # Verify the binary is executable
     try:
@@ -54,6 +48,12 @@ def main() -> int:
     except subprocess.TimeoutExpired:
         # --version hanging likely means the binary exists but has different CLI
         print("  Binary OK \u2713 (version check timed out)")
+    except PermissionError as exc:
+        print(f"  Error: cannot execute binary at {binary}: {exc}", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        print(f"  Error: unexpected failure: {exc}", file=sys.stderr)
+        return 1
 
     return 0
 

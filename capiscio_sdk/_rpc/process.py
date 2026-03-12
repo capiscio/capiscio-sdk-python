@@ -150,6 +150,20 @@ class ProcessManager:
         filename = f"capiscio-{os_name}-{arch_name}{ext}"
         return CACHE_DIR / CORE_VERSION / filename
 
+    def ensure_cached(self) -> Path:
+        """Ensure the capiscio-core binary is downloaded and cached.
+
+        Returns the path to the cached binary. If the binary is already
+        present in the versioned cache directory, the download is skipped.
+
+        This is the public API for pre-caching the binary without starting
+        the gRPC process (used by the ``capiscio-warmup`` CLI).
+        """
+        cached = self._get_cached_binary_path()
+        if cached.exists():
+            return cached
+        return self._download_binary()
+
     def _download_binary(self) -> Path:
         """Download the capiscio-core binary for the current platform.
         
