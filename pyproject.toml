@@ -55,6 +55,9 @@ dev = [
     "base58>=2.1.0",  # Used in tests for DID verification
 ]
 
+[project.scripts]
+capiscio-warmup = "capiscio_sdk.warmup:main"
+
 [project.urls]
 Homepage = "https://capisc.io"
 Documentation = "https://docs.capisc.io/sdk-python"
