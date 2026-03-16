@@ -121,6 +121,58 @@ class TestSimpleGuardInitialization:
         guard.close()
 
 
+class TestSimpleGuardDidKeyRecovery:
+    """Tests for dev mode did:key persistence and recovery."""
+
+    def test_dev_mode_persists_did_key_on_generate(self, temp_workspace, mock_rpc_client):
+        """Test that dev_mode persists did:key to sidecar file on first generation."""
+        mock_rpc_client.simpleguard.generate_key_pair.return_value = ({
+            "key_id": "test-key",
+            "did_key": "did:key:z6MkTestGeneratedKey",
+            "private_key_pem": "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
+            "public_key_pem": "-----BEGIN PUBLIC KEY-----\ntest\n-----END PUBLIC KEY-----",
+        }, None)
+
+        guard = SimpleGuard(dev_mode=True)
+
+        assert guard.agent_id == "did:key:z6MkTestGeneratedKey"
+        did_key_path = temp_workspace / "capiscio_keys" / "did_key.txt"
+        assert did_key_path.exists()
+        assert did_key_path.read_text() == "did:key:z6MkTestGeneratedKey"
+
+        guard.close()
+
+    def test_dev_mode_recovers_did_key_on_load(self, temp_workspace, mock_rpc_client):
+        """Test that dev_mode recovers did:key from sidecar file when key exists."""
+        keys_dir = temp_workspace / "capiscio_keys"
+        keys_dir.mkdir(parents=True)
+        (keys_dir / "trusted").mkdir()
+        (keys_dir / "private.pem").write_text("mock key")
+        (keys_dir / "public.pem").write_text("mock pub")
+        (keys_dir / "did_key.txt").write_text("did:key:z6MkRecoveredKey")
+
+        guard = SimpleGuard(dev_mode=True)
+
+        assert guard.agent_id == "did:key:z6MkRecoveredKey"
+        mock_rpc_client.simpleguard.generate_key_pair.assert_not_called()
+
+        guard.close()
+
+    def test_dev_mode_explicit_agent_id_ignores_sidecar(self, temp_workspace, mock_rpc_client):
+        """Test that explicit agent_id is not overridden by sidecar did_key.txt."""
+        keys_dir = temp_workspace / "capiscio_keys"
+        keys_dir.mkdir(parents=True)
+        (keys_dir / "trusted").mkdir()
+        (keys_dir / "private.pem").write_text("mock key")
+        (keys_dir / "did_key.txt").write_text("did:key:z6MkShouldBeIgnored")
+
+        guard = SimpleGuard(dev_mode=True, agent_id="did:web:example.com:myagent")
+
+        assert guard.agent_id == "did:web:example.com:myagent"
+
+        guard.close()
+
+
 class TestSimpleGuardSigning:
     """Tests for SimpleGuard signing operations."""
 

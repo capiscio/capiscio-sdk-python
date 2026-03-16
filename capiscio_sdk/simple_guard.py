@@ -300,6 +300,8 @@ class SimpleGuard:
             else:
                 raise ConfigurationError(f"capiscio_keys directory not found at {self.keys_dir}")
 
+        did_key_path = self.keys_dir / "did_key.txt"
+
         if private_key_path.exists():
             # Load existing key via gRPC
             key_info, error = self._client.simpleguard.load_key(str(private_key_path))
@@ -308,6 +310,11 @@ class SimpleGuard:
             # Update signing kid to match the loaded key
             self.signing_kid = key_info["key_id"]
             logger.info(f"Loaded key: {self.signing_kid}")
+
+            # Recover did:key identity from sidecar file if in dev mode
+            if self.dev_mode and not self._explicit_agent_id and did_key_path.exists():
+                self.agent_id = did_key_path.read_text().strip()
+                logger.info(f"Dev Mode: Recovered did:key identity: {self.agent_id}")
         elif self.dev_mode:
             logger.info("Dev Mode: Generating Ed25519 keypair via gRPC")
             
@@ -323,6 +330,8 @@ class SimpleGuard:
             if did_key and not self._explicit_agent_id:
                 self.agent_id = did_key
                 logger.info(f"Dev Mode: Using did:key identity: {self.agent_id}")
+                # Persist did:key for recovery on subsequent loads
+                did_key_path.write_text(did_key)
             
             # Save private key
             with open(private_key_path, "w") as f:
