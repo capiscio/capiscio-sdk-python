@@ -7,23 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-03-16
+
 ### Added
-- **Automatic Binary Download**: SDK now automatically downloads capiscio-core binary if not found
-  - Downloads from GitHub releases (defaults to v2.4.0)
+- **Warmup CLI**: Binary pre-caching command for faster cold starts (#43)
+- **Windows TCP Fallback**: Embedded gRPC server uses TCP on Windows where Unix sockets are unavailable (#39)
+- **Automatic Binary Download**: SDK downloads capiscio-core binary if not found (#32)
   - Platform detection for macOS (arm64/x86_64), Linux (arm64/x86_64), and Windows
-  - Binary caching in `~/.capiscio/bin/` directory
-  - Automatic executable permissions for Unix-like systems
-  - Fallback search order: `CAPISCIO_BINARY` env var → local development path → system PATH → cached binary → auto-download
-- **Middleware Auto-Events**: `CapiscioMiddleware` now supports automatic event emission
-  - Opt-in via `emitter` parameter — pass an `EventEmitter` to enable
-  - Emits `request.received`, `verification.success`/`verification.failed`, and `request.completed` events
-  - Standardized fields: `method`, `path`, `caller_did`, `duration_ms`, `status_code`
-  - Safe by design: emitter errors never break request handling
-  - Excluded paths emit no events
-  - New event type constants: `EVENT_REQUEST_RECEIVED`, `EVENT_REQUEST_COMPLETED`, `EVENT_REQUEST_FAILED`, `EVENT_VERIFICATION_SUCCESS`, `EVENT_VERIFICATION_FAILED`
+  - Binary caching in `~/.capiscio/bin/`
+  - Fallback search order: `CAPISCIO_BINARY` env var → local path → system PATH → cached → auto-download
+- **Middleware Auto-Events**: `CapiscioMiddleware` supports automatic event emission via `emitter` parameter (#33)
+- **Environment Variable Key Injection**: Support for ephemeral environments via env vars (#35)
+
+### Fixed
+- **Dev Mode Identity Persistence**: Persist and recover `did:key` identity across restarts (#44)
+- Wire `BadgeKeeper.on_renew` to `SimpleGuard.set_badge_token` for automatic badge refresh (#42)
+- Eliminate agent card JSON dependency from `connect`, `simple_guard`, and FastAPI integration (#37)
+- Improve binary install experience with better error messages (#38)
+- Improve identity recovery and directory structure (#31)
+- Make config keyword-only for backward compatibility (#30)
+- Create agent when name specified but not found in `connect()` (#29)
 
 ### Changed
-- **Improved Process Management**: Enhanced error logging and binary discovery
+- Enhanced error logging and binary discovery
 
 ## [2.4.1] - 2026-02-08
 
