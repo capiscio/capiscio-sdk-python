@@ -22,7 +22,7 @@ DEFAULT_SOCKET_DIR = Path.home() / ".capiscio"
 DEFAULT_SOCKET_PATH = DEFAULT_SOCKET_DIR / "rpc.sock"
 
 # Binary download configuration
-CORE_VERSION = "2.4.0"
+CORE_VERSION = "2.5.0"
 GITHUB_REPO = "capiscio/capiscio-core"
 CACHE_DIR = DEFAULT_SOCKET_DIR / "bin"
 
