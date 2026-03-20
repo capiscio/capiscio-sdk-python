@@ -40,7 +40,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 # ---------------------------------------------------------------------------
@@ -185,12 +185,16 @@ class ContextAttributes:
     """
 
     txn_id: str = ""
-    enforcement_mode: str = "EM-OBSERVE"
+    enforcement_mode: Union[str, EnforcementMode] = "EM-OBSERVE"
     hop_id: Optional[str] = None
     envelope_id: Optional[str] = None
     delegation_depth: Optional[int] = None
     constraints: Optional[Any] = None
     parent_constraints: Optional[Any] = None
+
+    def __post_init__(self) -> None:
+        if isinstance(self.enforcement_mode, EnforcementMode):
+            self.enforcement_mode = self.enforcement_mode.value
 
     def to_dict(self) -> Dict[str, Any]:
         return {

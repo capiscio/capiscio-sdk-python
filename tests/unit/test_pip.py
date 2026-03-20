@@ -179,6 +179,19 @@ class TestContextAttributes:
         assert "parent_constraints" in d
         assert d["parent_constraints"] is None
 
+    def test_enforcement_mode_enum_normalised(self) -> None:
+        """EnforcementMode enum should be normalised to its string value."""
+        c = ContextAttributes(
+            txn_id="txn-enum",
+            enforcement_mode=EnforcementMode.STRICT,
+        )
+        assert c.enforcement_mode == "EM-STRICT"
+        d = c.to_dict()
+        assert d["enforcement_mode"] == "EM-STRICT"
+        # Must be JSON-serialisable
+        j = json.dumps(d)
+        assert '"EM-STRICT"' in j
+
     def test_json_null_serialisation(self) -> None:
         """Verify JSON output has explicit null values for envelope fields."""
         c = ContextAttributes(txn_id="t")
