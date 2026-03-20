@@ -66,6 +66,23 @@ from .connect import CapiscIO, connect, from_env, AgentIdentity
 # Event emission
 from .events import EventEmitter
 
+# RFC-005: PIP request/response types
+from .pip import (
+    PIPRequest,
+    PIPResponse,
+    SubjectAttributes,
+    ActionAttributes,
+    ResourceAttributes,
+    ContextAttributes,
+    EnvironmentAttributes,
+    Obligation as PIPObligation,
+    EnforcementMode,
+    PIP_VERSION,
+    DECISION_ALLOW,
+    DECISION_DENY,
+    DECISION_OBSERVE,
+)
+
 __all__ = [
     "__version__",
     # Security middleware
@@ -119,5 +136,19 @@ __all__ = [
     "AgentIdentity",
     # Event emission
     "EventEmitter",
+    # RFC-005: PIP types
+    "PIPRequest",
+    "PIPResponse",
+    "SubjectAttributes",
+    "ActionAttributes",
+    "ResourceAttributes",
+    "ContextAttributes",
+    "EnvironmentAttributes",
+    "PIPObligation",
+    "EnforcementMode",
+    "PIP_VERSION",
+    "DECISION_ALLOW",
+    "DECISION_DENY",
+    "DECISION_OBSERVE",
 ]
 
