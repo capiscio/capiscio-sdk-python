@@ -7,15 +7,29 @@ import grpc
 
 from capiscio_sdk._rpc.process import ProcessManager, get_process_manager
 
-# Import generated stubs
+# Import generated stubs (eagerly loaded — used by core flows)
 from capiscio_sdk._rpc.gen.capiscio.v1 import badge_pb2, badge_pb2_grpc
 from capiscio_sdk._rpc.gen.capiscio.v1 import did_pb2, did_pb2_grpc
-from capiscio_sdk._rpc.gen.capiscio.v1 import mcp_pb2, mcp_pb2_grpc
 from capiscio_sdk._rpc.gen.capiscio.v1 import trust_pb2, trust_pb2_grpc
 from capiscio_sdk._rpc.gen.capiscio.v1 import revocation_pb2, revocation_pb2_grpc
 from capiscio_sdk._rpc.gen.capiscio.v1 import scoring_pb2, scoring_pb2_grpc
 from capiscio_sdk._rpc.gen.capiscio.v1 import simpleguard_pb2, simpleguard_pb2_grpc
 from capiscio_sdk._rpc.gen.capiscio.v1 import registry_pb2, registry_pb2_grpc
+
+# MCP protos are lazy-loaded to avoid descriptor pool conflicts when
+# capiscio-mcp registers its own copy of capiscio/v1/mcp.proto in the
+# same process (e.g. demo scripts that import both SDK and MCP).
+mcp_pb2 = None
+mcp_pb2_grpc = None
+
+
+def _ensure_mcp_protos():
+    global mcp_pb2, mcp_pb2_grpc
+    if mcp_pb2 is None:
+        from capiscio_sdk._rpc.gen.capiscio.v1 import mcp_pb2 as _mcp_pb2
+        from capiscio_sdk._rpc.gen.capiscio.v1 import mcp_pb2_grpc as _mcp_pb2_grpc
+        mcp_pb2 = _mcp_pb2
+        mcp_pb2_grpc = _mcp_pb2_grpc
 
 
 class CapiscioRPCClient:
@@ -110,7 +124,7 @@ class CapiscioRPCClient:
         # Initialize stubs
         self._badge_stub = badge_pb2_grpc.BadgeServiceStub(self._channel)
         self._did_stub = did_pb2_grpc.DIDServiceStub(self._channel)
-        self._mcp_stub = mcp_pb2_grpc.MCPServiceStub(self._channel)
+        self._mcp_stub = None  # Lazy-loaded via _ensure_mcp_stub()
         self._trust_stub = trust_pb2_grpc.TrustStoreServiceStub(self._channel)
         self._revocation_stub = revocation_pb2_grpc.RevocationServiceStub(self._channel)
         self._scoring_stub = scoring_pb2_grpc.ScoringServiceStub(self._channel)
@@ -120,7 +134,7 @@ class CapiscioRPCClient:
         # Initialize service wrappers
         self._badge = BadgeClient(self._badge_stub)
         self._did = DIDClient(self._did_stub)
-        self._mcp = MCPClient(self._mcp_stub)
+        self._mcp = None  # Lazy-loaded via mcp property
         self._trust = TrustStoreClient(self._trust_stub)
         self._revocation = RevocationClient(self._revocation_stub)
         self._scoring = ScoringClient(self._scoring_stub)
@@ -173,7 +187,10 @@ class CapiscioRPCClient:
     def mcp(self) -> "MCPClient":
         """Access the MCPService (RFC-006 / RFC-007)."""
         self._ensure_connected()
-        assert self._mcp is not None
+        if self._mcp is None:
+            _ensure_mcp_protos()
+            self._mcp_stub = mcp_pb2_grpc.MCPServiceStub(self._channel)
+            self._mcp = MCPClient(self._mcp_stub)
         return self._mcp
     
     @property
@@ -1365,7 +1382,7 @@ class MCPClient:
         )
     """
     
-    def __init__(self, stub: mcp_pb2_grpc.MCPServiceStub) -> None:
+    def __init__(self, stub) -> None:
         self._stub = stub
     
     def evaluate_tool_access(
