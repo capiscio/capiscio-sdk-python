@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-03-27
+
+### Added
+- **PIP Request Builder**: RFC-005 Step 9 — Policy Information Point request builder types (#46)
+
+### Fixed
+- **Proto Descriptor Collision**: Lazy-load MCP protos to prevent descriptor pool conflicts when co-installed with capiscio-mcp (#47)
+- **PyPI Wheel Packaging**: Force-include nested proto files in wheel and sdist builds (#47)
+
 ## [2.5.0] - 2026-03-16
 
 ### Added
