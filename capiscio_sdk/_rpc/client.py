@@ -124,7 +124,7 @@ class CapiscioRPCClient:
         # Initialize stubs
         self._badge_stub = badge_pb2_grpc.BadgeServiceStub(self._channel)
         self._did_stub = did_pb2_grpc.DIDServiceStub(self._channel)
-        self._mcp_stub = None  # Lazy-loaded via _ensure_mcp_stub()
+        self._mcp_stub = None  # Lazy-loaded via mcp property (uses _ensure_mcp_protos())
         self._trust_stub = trust_pb2_grpc.TrustStoreServiceStub(self._channel)
         self._revocation_stub = revocation_pb2_grpc.RevocationServiceStub(self._channel)
         self._scoring_stub = scoring_pb2_grpc.ScoringServiceStub(self._channel)
