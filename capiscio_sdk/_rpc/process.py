@@ -179,9 +179,7 @@ class ProcessManager:
         if target_path.exists():
             return target_path
 
-        ext = ".exe" if os_name == "windows" else ""
-        filename = f"capiscio-{os_name}-{arch_name}{ext}"
-        url = f"https://github.com/{GITHUB_REPO}/releases/download/v{CORE_VERSION}/{filename}"
+        url = f"https://github.com/{GITHUB_REPO}/releases/download/v{CORE_VERSION}/{target_path.name}"
 
         sys.stderr.write(
             f"capiscio-core v{CORE_VERSION} not found. "
@@ -200,22 +198,18 @@ class ProcessManager:
                         for chunk in resp.iter_bytes(chunk_size=8192):
                             f.write(chunk)
 
-                # Make executable
-                st = os.stat(target_path)
-                os.chmod(target_path, st.st_mode | stat.S_IEXEC)
-
-                # Verify checksum integrity
+                # Verify checksum integrity BEFORE making executable
                 require_checksum = os.environ.get("CAPISCIO_REQUIRE_CHECKSUM", "").lower() in ("1", "true", "yes")
-                expected_hash = self._fetch_expected_checksum(CORE_VERSION, filename)
+                expected_hash = self._fetch_expected_checksum(CORE_VERSION, target_path.name)
                 if expected_hash is not None:
                     if not self._verify_checksum(target_path, expected_hash):
                         target_path.unlink()
                         raise RuntimeError(
-                            f"Binary integrity check failed for {filename}. "
+                            f"Binary integrity check failed for {target_path.name}. "
                             "The downloaded file does not match the published checksum. "
                             "This may indicate a tampered or corrupted download."
                         )
-                    logger.info("Checksum verified for %s", filename)
+                    logger.info("Checksum verified for %s", target_path.name)
                 elif require_checksum:
                     target_path.unlink()
                     raise RuntimeError(
@@ -228,6 +222,10 @@ class ProcessManager:
                         "Could not verify binary integrity (checksums.txt not available). "
                         "Set CAPISCIO_REQUIRE_CHECKSUM=true to enforce verification."
                     )
+
+                # Make executable only after checksum passes
+                st = os.stat(target_path)
+                os.chmod(target_path, st.st_mode | stat.S_IEXEC)
 
                 sys.stderr.write(f"Installed capiscio-core v{CORE_VERSION} at {target_path}\n")
                 sys.stderr.flush()

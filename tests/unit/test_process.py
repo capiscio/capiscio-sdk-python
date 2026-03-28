@@ -304,3 +304,226 @@ class TestProcessManager:
         pm._socket_path = None
         from capiscio_sdk._rpc.process import DEFAULT_SOCKET_PATH
         assert pm.address == f"unix://{DEFAULT_SOCKET_PATH}"
+
+
+class TestChecksumVerification:
+    """Tests for binary checksum verification paths."""
+
+    @patch("httpx.get")
+    def test_fetch_expected_checksum_success(self, mock_get):
+        """Test _fetch_expected_checksum returns hash when file is found."""
+        mock_resp = MagicMock()
+        mock_resp.text = (
+            "abc123def456  capiscio-linux-amd64\n"
+            "789xyz000111  capiscio-darwin-arm64\n"
+        )
+        mock_resp.raise_for_status = MagicMock()
+        mock_get.return_value = mock_resp
+
+        result = ProcessManager._fetch_expected_checksum("2.5.0", "capiscio-linux-amd64")
+        assert result == "abc123def456"
+
+    @patch("httpx.get")
+    def test_fetch_expected_checksum_file_not_in_list(self, mock_get):
+        """Test _fetch_expected_checksum returns None when filename not in checksums."""
+        mock_resp = MagicMock()
+        mock_resp.text = "abc123  capiscio-linux-amd64\n"
+        mock_resp.raise_for_status = MagicMock()
+        mock_get.return_value = mock_resp
+
+        result = ProcessManager._fetch_expected_checksum("2.5.0", "capiscio-darwin-arm64")
+        assert result is None
+
+    @patch("httpx.get")
+    def test_fetch_expected_checksum_http_error(self, mock_get):
+        """Test _fetch_expected_checksum returns None on HTTP error."""
+        import httpx as httpx_mod
+        mock_get.side_effect = httpx_mod.HTTPError("connection failed")
+
+        result = ProcessManager._fetch_expected_checksum("2.5.0", "capiscio-linux-amd64")
+        assert result is None
+
+    @patch("httpx.get")
+    @patch("httpx.stream")
+    @patch("os.chmod")
+    @patch("os.stat")
+    def test_download_binary_checksum_match(self, mock_stat, mock_chmod, mock_stream, mock_get):
+        """Test successful download with matching checksum."""
+        pm = ProcessManager()
+
+        with patch("capiscio_sdk._rpc.process.platform.system", return_value="Linux"):
+            with patch("capiscio_sdk._rpc.process.platform.machine", return_value="x86_64"):
+                with patch.object(ProcessManager, "_get_cached_binary_path") as mock_cached:
+                    mock_path = MagicMock(spec=Path)
+                    mock_path.exists.return_value = False
+                    mock_path.parent = MagicMock()
+                    mock_path.name = "capiscio-linux-amd64"
+                    mock_cached.return_value = mock_path
+
+                    # Mock stream download
+                    mock_response = MagicMock()
+                    mock_response.iter_bytes.return_value = [b"binary_data"]
+                    mock_stream.return_value.__enter__.return_value = mock_response
+
+                    # Mock checksum fetch (returns a hash)
+                    mock_get_resp = MagicMock()
+                    mock_get_resp.text = "fakehash123  capiscio-linux-amd64\n"
+                    mock_get_resp.raise_for_status = MagicMock()
+                    mock_get.return_value = mock_get_resp
+
+                    # Mock verify_checksum to return True
+                    with patch.object(ProcessManager, "_verify_checksum", return_value=True):
+                        m_open = mock_open()
+                        with patch("builtins.open", m_open):
+                            result = pm._download_binary()
+
+                    assert result == mock_path
+                    # chmod should be called (checksum passed)
+                    mock_chmod.assert_called_once()
+
+    @patch("httpx.get")
+    @patch("httpx.stream")
+    def test_download_binary_checksum_mismatch_deletes_file(self, mock_stream, mock_get):
+        """Test that checksum mismatch deletes the file and raises."""
+        pm = ProcessManager()
+
+        with patch("capiscio_sdk._rpc.process.platform.system", return_value="Linux"):
+            with patch("capiscio_sdk._rpc.process.platform.machine", return_value="x86_64"):
+                with patch.object(ProcessManager, "_get_cached_binary_path") as mock_cached:
+                    mock_path = MagicMock(spec=Path)
+                    mock_path.exists.return_value = False
+                    mock_path.parent = MagicMock()
+                    mock_path.name = "capiscio-linux-amd64"
+                    mock_cached.return_value = mock_path
+
+                    mock_response = MagicMock()
+                    mock_response.iter_bytes.return_value = [b"bad_data"]
+                    mock_stream.return_value.__enter__.return_value = mock_response
+
+                    mock_get_resp = MagicMock()
+                    mock_get_resp.text = "expected_hash  capiscio-linux-amd64\n"
+                    mock_get_resp.raise_for_status = MagicMock()
+                    mock_get.return_value = mock_get_resp
+
+                    with patch.object(ProcessManager, "_verify_checksum", return_value=False):
+                        m_open = mock_open()
+                        with patch("builtins.open", m_open):
+                            with pytest.raises(RuntimeError, match="integrity check failed"):
+                                pm._download_binary()
+
+                    # File should have been deleted
+                    mock_path.unlink.assert_called()
+
+    @patch("httpx.get")
+    @patch("httpx.stream")
+    def test_download_binary_require_checksum_no_checksums_available(self, mock_stream, mock_get):
+        """Test CAPISCIO_REQUIRE_CHECKSUM fails when checksums.txt unavailable."""
+        import httpx as httpx_mod
+        pm = ProcessManager()
+
+        with patch("capiscio_sdk._rpc.process.platform.system", return_value="Linux"):
+            with patch("capiscio_sdk._rpc.process.platform.machine", return_value="x86_64"):
+                with patch.object(ProcessManager, "_get_cached_binary_path") as mock_cached:
+                    mock_path = MagicMock(spec=Path)
+                    mock_path.exists.return_value = False
+                    mock_path.parent = MagicMock()
+                    mock_path.name = "capiscio-linux-amd64"
+                    mock_cached.return_value = mock_path
+
+                    mock_response = MagicMock()
+                    mock_response.iter_bytes.return_value = [b"data"]
+                    mock_stream.return_value.__enter__.return_value = mock_response
+
+                    # checksums.txt fetch fails
+                    mock_get.side_effect = httpx_mod.HTTPError("404")
+
+                    with patch.dict(os.environ, {"CAPISCIO_REQUIRE_CHECKSUM": "true"}):
+                        m_open = mock_open()
+                        with patch("builtins.open", m_open):
+                            with pytest.raises(RuntimeError, match="Checksum verification required"):
+                                pm._download_binary()
+
+                    mock_path.unlink.assert_called()
+
+    @patch("httpx.get")
+    @patch("httpx.stream")
+    @patch("os.chmod")
+    @patch("os.stat")
+    def test_download_binary_checksums_unavailable_without_require(
+        self, mock_stat, mock_chmod, mock_stream, mock_get
+    ):
+        """Test download proceeds with warning when checksums unavailable and not required."""
+        import httpx as httpx_mod
+        pm = ProcessManager()
+
+        with patch("capiscio_sdk._rpc.process.platform.system", return_value="Linux"):
+            with patch("capiscio_sdk._rpc.process.platform.machine", return_value="x86_64"):
+                with patch.object(ProcessManager, "_get_cached_binary_path") as mock_cached:
+                    mock_path = MagicMock(spec=Path)
+                    mock_path.exists.return_value = False
+                    mock_path.parent = MagicMock()
+                    mock_path.name = "capiscio-linux-amd64"
+                    mock_cached.return_value = mock_path
+
+                    mock_response = MagicMock()
+                    mock_response.iter_bytes.return_value = [b"data"]
+                    mock_stream.return_value.__enter__.return_value = mock_response
+
+                    # checksums.txt not available
+                    mock_get.side_effect = httpx_mod.HTTPError("404")
+
+                    with patch.dict(os.environ, {}, clear=False):
+                        # Ensure CAPISCIO_REQUIRE_CHECKSUM is not set
+                        os.environ.pop("CAPISCIO_REQUIRE_CHECKSUM", None)
+                        m_open = mock_open()
+                        with patch("builtins.open", m_open):
+                            result = pm._download_binary()
+
+                    # Should succeed despite no checksum
+                    assert result == mock_path
+                    mock_chmod.assert_called_once()
+
+    @patch("httpx.get")
+    @patch("httpx.stream")
+    @patch("os.chmod")
+    @patch("os.stat")
+    def test_download_binary_chmod_after_checksum(self, mock_stat, mock_chmod, mock_stream, mock_get):
+        """Test that chmod happens AFTER checksum verification, not before."""
+        pm = ProcessManager()
+        call_order = []
+
+        with patch("capiscio_sdk._rpc.process.platform.system", return_value="Linux"):
+            with patch("capiscio_sdk._rpc.process.platform.machine", return_value="x86_64"):
+                with patch.object(ProcessManager, "_get_cached_binary_path") as mock_cached:
+                    mock_path = MagicMock(spec=Path)
+                    mock_path.exists.return_value = False
+                    mock_path.parent = MagicMock()
+                    mock_path.name = "capiscio-linux-amd64"
+                    mock_cached.return_value = mock_path
+
+                    mock_response = MagicMock()
+                    mock_response.iter_bytes.return_value = [b"data"]
+                    mock_stream.return_value.__enter__.return_value = mock_response
+
+                    mock_get_resp = MagicMock()
+                    mock_get_resp.text = "fakehash  capiscio-linux-amd64\n"
+                    mock_get_resp.raise_for_status = MagicMock()
+                    mock_get.return_value = mock_get_resp
+
+                    def track_verify(*a, **kw):
+                        call_order.append("verify")
+                        return True
+
+                    def track_chmod(*a, **kw):
+                        call_order.append("chmod")
+
+                    mock_chmod.side_effect = track_chmod
+
+                    with patch.object(ProcessManager, "_verify_checksum", side_effect=track_verify):
+                        m_open = mock_open()
+                        with patch("builtins.open", m_open):
+                            pm._download_binary()
+
+                    assert call_order == ["verify", "chmod"], (
+                        f"Expected verify before chmod, got: {call_order}"
+                    )
