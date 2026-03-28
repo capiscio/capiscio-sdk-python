@@ -1,6 +1,7 @@
 """Process manager for the capiscio-core gRPC server."""
 
 import atexit
+import hashlib
 import logging
 import os
 import platform
@@ -168,6 +169,7 @@ class ProcessManager:
         """Download the capiscio-core binary for the current platform.
         
         Downloads from GitHub releases to ~/.capiscio/bin/<version>/.
+        Verifies SHA-256 checksum against published checksums.txt.
         Retries up to 3 times with exponential backoff.
         Returns the path to the executable.
         """
@@ -177,9 +179,7 @@ class ProcessManager:
         if target_path.exists():
             return target_path
 
-        ext = ".exe" if os_name == "windows" else ""
-        filename = f"capiscio-{os_name}-{arch_name}{ext}"
-        url = f"https://github.com/{GITHUB_REPO}/releases/download/v{CORE_VERSION}/{filename}"
+        url = f"https://github.com/{GITHUB_REPO}/releases/download/v{CORE_VERSION}/{target_path.name}"
 
         sys.stderr.write(
             f"capiscio-core v{CORE_VERSION} not found. "
@@ -198,7 +198,32 @@ class ProcessManager:
                         for chunk in resp.iter_bytes(chunk_size=8192):
                             f.write(chunk)
 
-                # Make executable
+                # Verify checksum integrity BEFORE making executable
+                require_checksum = os.environ.get("CAPISCIO_REQUIRE_CHECKSUM", "").lower() in ("1", "true", "yes")
+                expected_hash = self._fetch_expected_checksum(CORE_VERSION, target_path.name)
+                if expected_hash is not None:
+                    if not self._verify_checksum(target_path, expected_hash):
+                        target_path.unlink()
+                        raise RuntimeError(
+                            f"Binary integrity check failed for {target_path.name}. "
+                            "The downloaded file does not match the published checksum. "
+                            "This may indicate a tampered or corrupted download."
+                        )
+                    logger.info("Checksum verified for %s", target_path.name)
+                elif require_checksum:
+                    target_path.unlink()
+                    raise RuntimeError(
+                        f"Checksum verification required (CAPISCIO_REQUIRE_CHECKSUM=true) "
+                        f"but checksums.txt is not available for v{CORE_VERSION}. "
+                        "Cannot verify binary integrity."
+                    )
+                else:
+                    logger.warning(
+                        "Could not verify binary integrity (checksums.txt not available). "
+                        "Set CAPISCIO_REQUIRE_CHECKSUM=true to enforce verification."
+                    )
+
+                # Make executable only after checksum passes
                 st = os.stat(target_path)
                 os.chmod(target_path, st.st_mode | stat.S_IEXEC)
 
@@ -225,6 +250,36 @@ class ProcessManager:
                     ) from e
         # unreachable, but keeps type checker happy
         raise RuntimeError("Download failed")
+
+    @staticmethod
+    def _fetch_expected_checksum(version: str, filename: str) -> Optional[str]:
+        """Fetch the expected SHA-256 checksum from the release checksums.txt."""
+        url = f"https://github.com/{GITHUB_REPO}/releases/download/v{version}/checksums.txt"
+        try:
+            resp = httpx.get(url, follow_redirects=True, timeout=30.0)
+            resp.raise_for_status()
+            for line in resp.text.strip().splitlines():
+                parts = line.split()
+                if len(parts) == 2 and parts[1] == filename:
+                    return parts[0]
+            logger.warning("Binary %s not found in checksums.txt", filename)
+            return None
+        except httpx.HTTPError as e:
+            logger.warning("Could not fetch checksums.txt: %s", e)
+            return None
+
+    @staticmethod
+    def _verify_checksum(file_path: Path, expected_hash: str) -> bool:
+        """Verify SHA-256 checksum of a downloaded file."""
+        sha256 = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha256.update(chunk)
+        actual = sha256.hexdigest()
+        if actual != expected_hash:
+            logger.error("Checksum mismatch: expected %s, got %s", expected_hash, actual)
+            return False
+        return True
     
     def ensure_running(
         self,
