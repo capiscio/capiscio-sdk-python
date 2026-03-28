@@ -205,6 +205,7 @@ class ProcessManager:
                 os.chmod(target_path, st.st_mode | stat.S_IEXEC)
 
                 # Verify checksum integrity
+                require_checksum = os.environ.get("CAPISCIO_REQUIRE_CHECKSUM", "").lower() in ("1", "true", "yes")
                 expected_hash = self._fetch_expected_checksum(CORE_VERSION, filename)
                 if expected_hash is not None:
                     if not self._verify_checksum(target_path, expected_hash):
@@ -215,10 +216,17 @@ class ProcessManager:
                             "This may indicate a tampered or corrupted download."
                         )
                     logger.info("Checksum verified for %s", filename)
+                elif require_checksum:
+                    target_path.unlink()
+                    raise RuntimeError(
+                        f"Checksum verification required (CAPISCIO_REQUIRE_CHECKSUM=true) "
+                        f"but checksums.txt is not available for v{CORE_VERSION}. "
+                        "Cannot verify binary integrity."
+                    )
                 else:
                     logger.warning(
                         "Could not verify binary integrity (checksums.txt not available). "
-                        "Consider upgrading capiscio-core to a version that publishes checksums."
+                        "Set CAPISCIO_REQUIRE_CHECKSUM=true to enforce verification."
                     )
 
                 sys.stderr.write(f"Installed capiscio-core v{CORE_VERSION} at {target_path}\n")
