@@ -18,9 +18,10 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# Default socket path
+# Default socket path — use PID-specific path to avoid contention
+# with orphaned capiscio-core processes from previous runs.
 DEFAULT_SOCKET_DIR = Path.home() / ".capiscio"
-DEFAULT_SOCKET_PATH = DEFAULT_SOCKET_DIR / "rpc.sock"
+DEFAULT_SOCKET_PATH = DEFAULT_SOCKET_DIR / f"rpc-{os.getpid()}.sock"
 
 # Binary download configuration
 CORE_VERSION = "2.5.0"
