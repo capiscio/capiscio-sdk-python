@@ -21,7 +21,35 @@ logger = logging.getLogger(__name__)
 # Default socket path — use PID-specific path to avoid contention
 # with orphaned capiscio-core processes from previous runs.
 DEFAULT_SOCKET_DIR = Path.home() / ".capiscio"
-DEFAULT_SOCKET_PATH = DEFAULT_SOCKET_DIR / f"rpc-{os.getpid()}.sock"
+
+
+def _default_socket_path() -> Path:
+    """Compute PID-specific socket path lazily at runtime.
+
+    This must NOT be computed at import time because forked child processes
+    would inherit the parent's PID-based path and contend on the same socket.
+    """
+    return DEFAULT_SOCKET_DIR / f"rpc-{os.getpid()}.sock"
+
+
+def _cleanup_stale_sockets() -> None:
+    """Remove rpc-*.sock files whose PID is no longer running."""
+    try:
+        for sock in DEFAULT_SOCKET_DIR.glob("rpc-*.sock"):
+            try:
+                pid_str = sock.stem.split("-", 1)[1]
+                pid = int(pid_str)
+                os.kill(pid, 0)  # Check if PID exists
+            except (ValueError, IndexError):
+                sock.unlink(missing_ok=True)
+            except ProcessLookupError:
+                # PID doesn't exist — stale socket
+                logger.debug("Removing stale socket %s", sock)
+                sock.unlink(missing_ok=True)
+            except PermissionError:
+                pass  # PID exists but owned by another user
+    except OSError:
+        pass
 
 # Binary download configuration
 CORE_VERSION = "2.5.0"
@@ -74,7 +102,7 @@ class ProcessManager:
             return self._tcp_address
         if self._socket_path:
             return f"unix://{self._socket_path}"
-        return f"unix://{DEFAULT_SOCKET_PATH}"
+        return f"unix://{_default_socket_path()}"
     
     @property
     def is_running(self) -> bool:
@@ -352,10 +380,13 @@ class ProcessManager:
     ) -> str:
         """Start the gRPC server with a Unix socket listener."""
         # Set up socket path
-        self._socket_path = socket_path or DEFAULT_SOCKET_PATH
+        self._socket_path = socket_path or _default_socket_path()
         
         # Ensure socket directory exists
         self._socket_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Clean up stale sockets from previous runs
+        _cleanup_stale_sockets()
         
         # Remove stale socket
         if self._socket_path.exists():

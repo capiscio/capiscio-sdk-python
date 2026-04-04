@@ -302,8 +302,8 @@ class TestProcessManager:
         pm = ProcessManager()
         pm._tcp_address = None
         pm._socket_path = None
-        from capiscio_sdk._rpc.process import DEFAULT_SOCKET_PATH
-        assert pm.address == f"unix://{DEFAULT_SOCKET_PATH}"
+        from capiscio_sdk._rpc.process import _default_socket_path
+        assert pm.address == f"unix://{_default_socket_path()}"
 
 
 class TestChecksumVerification:
