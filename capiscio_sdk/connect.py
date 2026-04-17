@@ -18,6 +18,7 @@ Usage:
 
 import json
 import os
+import sys
 import logging
 import httpx
 from pathlib import Path
@@ -54,9 +55,14 @@ def _public_jwk_from_private(private_jwk: dict) -> dict:
 
 
 def _log_agent_key_capture_hint(agent_id: str, private_jwk: dict) -> None:
-    """Log a one-time hint telling the user how to persist key material."""
-    compact_json = json.dumps(private_jwk, separators=(",", ":"))
-    logger.warning(
+    """Log a one-time hint telling the user how to persist key material.
+
+    SECURITY: Never log private key material. Instead, direct users to
+    export the key using the CLI or check the identity directory.
+    """
+    # Derive the key ID (kid) from the public portion for identification only
+    kid = private_jwk.get("kid", "unknown")
+    print(
         "\n"
         "  \u2554" + "\u2550" * 62 + "\u2557\n"
         "  \u2551  New agent identity generated \u2014 save key for persistence   \u2551\n"
@@ -66,11 +72,18 @@ def _log_agent_key_capture_hint(agent_id: str, private_jwk: dict) -> None:
         "  serverless, CI) the identity will be lost on restart unless\n"
         "  you persist the private key.\n"
         "\n"
-        "  Add to your secrets manager / .env:\n"
+        f"  Key ID: {kid}\n"
         "\n"
-        "    CAPISCIO_AGENT_PRIVATE_KEY_JWK='" + compact_json + "'\n"
+        "  To export the private key for your secrets manager:\n"
         "\n"
-        "  The DID will be recovered automatically from the JWK on startup.\n"
+        "    capiscio identity export --format env\n"
+        "\n"
+        "  Or copy the key file from:\n"
+        "\n"
+        "    ~/.capiscio/identities/<agent>/private.jwk\n"
+        "\n"
+        "  The DID will be recovered automatically from the JWK on startup.\n",
+        file=sys.stderr,
     )
 
 
