@@ -18,6 +18,7 @@ Usage:
 
 import json
 import os
+import sys
 import logging
 import httpx
 from pathlib import Path
@@ -53,10 +54,16 @@ def _public_jwk_from_private(private_jwk: dict) -> dict:
     return public
 
 
-def _log_agent_key_capture_hint(agent_id: str, private_jwk: dict) -> None:
-    """Log a one-time hint telling the user how to persist key material."""
-    compact_json = json.dumps(private_jwk, separators=(",", ":"))
-    logger.warning(
+def _print_agent_key_capture_hint(agent_id: str, private_jwk: dict) -> None:
+    """Print a one-time hint telling the user how to persist key material.
+
+    SECURITY: Never output private key material. Only the key ID (kid) is
+    shown. Users are directed to the CLI or key files for export.
+
+    Output goes to stderr so it doesn't interfere with stdout-based protocols.
+    """
+    kid = private_jwk.get("kid", "unknown")
+    print(
         "\n"
         "  \u2554" + "\u2550" * 62 + "\u2557\n"
         "  \u2551  New agent identity generated \u2014 save key for persistence   \u2551\n"
@@ -66,11 +73,18 @@ def _log_agent_key_capture_hint(agent_id: str, private_jwk: dict) -> None:
         "  serverless, CI) the identity will be lost on restart unless\n"
         "  you persist the private key.\n"
         "\n"
-        "  Add to your secrets manager / .env:\n"
+        f"  Key ID: {kid}\n"
         "\n"
-        "    CAPISCIO_AGENT_PRIVATE_KEY_JWK='" + compact_json + "'\n"
+        "  To export the private key for your secrets manager:\n"
         "\n"
-        "  The DID will be recovered automatically from the JWK on startup.\n"
+        "    capiscio identity export --format env\n"
+        "\n"
+        "  Or copy the key file from:\n"
+        "\n"
+        f"    ~/.capiscio/keys/{agent_id}/private.jwk\n"
+        "\n"
+        "  The DID will be recovered automatically from the JWK on startup.\n",
+        file=sys.stderr,
     )
 
 
@@ -697,7 +711,7 @@ class _Connector:
         if private_key_path.exists():
             try:
                 private_jwk = json.loads(private_key_path.read_text())
-                _log_agent_key_capture_hint(self.agent_id, private_jwk)
+                _print_agent_key_capture_hint(self.agent_id, private_jwk)
             except Exception:
                 pass  # Best-effort hint
 
