@@ -18,9 +18,41 @@ from capiscio_sdk.connect import (
     DEFAULT_KEYS_DIR,
     ENV_AGENT_PRIVATE_KEY,
     PROD_REGISTRY,
-    _log_agent_key_capture_hint,
+    _print_agent_key_capture_hint,
     _public_jwk_from_private,
 )
+
+
+class TestPrintAgentKeyCaptureHint:
+    """Regression tests for _print_agent_key_capture_hint — security-critical."""
+
+    def test_no_private_key_material_in_output(self, capsys):
+        """SECURITY: Output must never contain private key 'd' parameter or full JWK."""
+        private_jwk = {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "kid": "did:key:z6MkSafe",
+            "x": "public_x_value_base64",
+            "d": "SUPER_SECRET_PRIVATE_KEY_VALUE",
+        }
+        _print_agent_key_capture_hint("my-agent", private_jwk)
+        captured = capsys.readouterr()
+        stderr_output = captured.err
+
+        # Must NOT contain private key material
+        assert "SUPER_SECRET_PRIVATE_KEY_VALUE" not in stderr_output
+        assert '"d"' not in stderr_output
+        assert "public_x_value_base64" not in stderr_output
+
+        # Must contain only kid for identification
+        assert "did:key:z6MkSafe" in stderr_output
+
+    def test_correct_key_path_in_output(self, capsys):
+        """Output must show the correct default key file path."""
+        private_jwk = {"kty": "OKP", "crv": "Ed25519", "kid": "did:key:z6Mk1"}
+        _print_agent_key_capture_hint("agent-42", private_jwk)
+        captured = capsys.readouterr()
+        assert "~/.capiscio/keys/agent-42/private.jwk" in captured.err
 
 
 class TestAgentIdentity:
@@ -933,7 +965,7 @@ class TestConnector:
             "d": "gen", "x": "gen",
         }))
 
-        with patch.object(connect_module, "_log_agent_key_capture_hint") as mock_hint:
+        with patch.object(connect_module, "_print_agent_key_capture_hint") as mock_hint:
             connector._init_identity()
 
         mock_hint.assert_called_once()
@@ -962,7 +994,7 @@ class TestConnector:
         )
         connector._ensure_did_registered = MagicMock(return_value=None)
 
-        with patch.object(connect_module, "_log_agent_key_capture_hint") as mock_hint:
+        with patch.object(connect_module, "_print_agent_key_capture_hint") as mock_hint:
             connector._init_identity()
 
         mock_hint.assert_not_called()

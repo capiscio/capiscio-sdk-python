@@ -54,13 +54,14 @@ def _public_jwk_from_private(private_jwk: dict) -> dict:
     return public
 
 
-def _log_agent_key_capture_hint(agent_id: str, private_jwk: dict) -> None:
-    """Log a one-time hint telling the user how to persist key material.
+def _print_agent_key_capture_hint(agent_id: str, private_jwk: dict) -> None:
+    """Print a one-time hint telling the user how to persist key material.
 
-    SECURITY: Never log private key material. Instead, direct users to
-    export the key using the CLI or check the identity directory.
+    SECURITY: Never output private key material. Only the key ID (kid) is
+    shown. Users are directed to the CLI or key files for export.
+
+    Output goes to stderr so it doesn't interfere with stdout-based protocols.
     """
-    # Derive the key ID (kid) from the public portion for identification only
     kid = private_jwk.get("kid", "unknown")
     print(
         "\n"
@@ -80,7 +81,7 @@ def _log_agent_key_capture_hint(agent_id: str, private_jwk: dict) -> None:
         "\n"
         "  Or copy the key file from:\n"
         "\n"
-        "    ~/.capiscio/identities/<agent>/private.jwk\n"
+        f"    ~/.capiscio/keys/{agent_id}/private.jwk\n"
         "\n"
         "  The DID will be recovered automatically from the JWK on startup.\n",
         file=sys.stderr,
@@ -710,7 +711,7 @@ class _Connector:
         if private_key_path.exists():
             try:
                 private_jwk = json.loads(private_key_path.read_text())
-                _log_agent_key_capture_hint(self.agent_id, private_jwk)
+                _print_agent_key_capture_hint(self.agent_id, private_jwk)
             except Exception:
                 pass  # Best-effort hint
 
