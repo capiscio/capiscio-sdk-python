@@ -1754,14 +1754,31 @@ class RegistryClient:
     
     def get_agent(self, did: str) -> tuple[Optional[dict], Optional[str]]:
         """Get an agent by DID."""
-        request = registry_pb2.GetAgentRequest(did=did)
+        request = registry_pb2.GetAgentRequest(did=did, include_badge=True)
         response = self._stub.GetAgent(request)
         
         if response.error_message:
             return None, response.error_message
         
-        # TODO: Convert response.agent to dict
-        return None, "not yet implemented"
+        agent = response.agent
+        if not agent or not agent.did:
+            return None, "agent not found"
+        
+        result = {
+            "did": agent.did,
+            "name": agent.name,
+            "description": agent.description,
+            "status": agent.status,
+            "agent_card_json": agent.agent_card_json,
+            "capabilities": list(agent.capabilities),
+            "tags": list(agent.tags),
+        }
+
+        # Include badge domain if badge is present
+        if agent.badge and agent.badge.domain:
+            result["domain"] = agent.badge.domain
+
+        return result, None
 
 
 def _claims_to_dict(claims) -> dict:
@@ -1770,9 +1787,11 @@ def _claims_to_dict(claims) -> dict:
         return {}
     
     # Map proto enum to human-readable trust level string
-    # Note: UNSPECIFIED (0) defaults to "1" (DV) for compatibility
+    # SECURITY: UNSPECIFIED (0) is coerced to Level 0 (self-signed / unverified).
+    # This is the lowest trust level. Mapping it higher would silently elevate
+    # unverified badges.
     trust_level_map = {
-        0: "1",  # TRUST_LEVEL_UNSPECIFIED -> default to DV (1)
+        0: "0",  # TRUST_LEVEL_UNSPECIFIED -> coerced to Level 0 (lowest)
         1: "0",  # TRUST_LEVEL_SELF_SIGNED (Level 0)
         2: "1",  # TRUST_LEVEL_DV (Level 1)
         3: "2",  # TRUST_LEVEL_OV (Level 2)
