@@ -1760,8 +1760,17 @@ class RegistryClient:
         if response.error_message:
             return None, response.error_message
         
-        # TODO: Convert response.agent to dict
-        return None, "not yet implemented"
+        agent = response.agent
+        if not agent or not agent.did:
+            return None, "agent not found"
+        
+        return {
+            "id": agent.id,
+            "did": agent.did,
+            "name": agent.name,
+            "domain": agent.domain,
+            "status": agent.status,
+        }, None
 
 
 def _claims_to_dict(claims) -> dict:
@@ -1770,9 +1779,10 @@ def _claims_to_dict(claims) -> dict:
         return {}
     
     # Map proto enum to human-readable trust level string
-    # Note: UNSPECIFIED (0) defaults to "1" (DV) for compatibility
+    # SECURITY: UNSPECIFIED (0) MUST map to "0" (none), never to a verified level.
+    # Mapping UNSPECIFIED to DV would silently elevate unverified badges.
     trust_level_map = {
-        0: "1",  # TRUST_LEVEL_UNSPECIFIED -> default to DV (1)
+        0: "0",  # TRUST_LEVEL_UNSPECIFIED -> none/unverified
         1: "0",  # TRUST_LEVEL_SELF_SIGNED (Level 0)
         2: "1",  # TRUST_LEVEL_DV (Level 1)
         3: "2",  # TRUST_LEVEL_OV (Level 2)
