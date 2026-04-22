@@ -96,17 +96,33 @@ class SignatureValidator:
         if public_key:
             try:
                 import jwt
+                import json
                 
                 # Verify signature
-                jwt.decode(
+                decoded = jwt.decode(
                     signature,
                     public_key,
                     algorithms=['RS256', 'ES256', 'PS256'],
                     options={"verify_signature": True}
                 )
                 
-                # Signature is valid
-                logger.debug("Signature verified successfully")
+                # Bind: compare decoded payload against caller-supplied payload
+                # Use canonical JSON comparison to avoid ordering issues
+                caller_json = json.dumps(payload, sort_keys=True, separators=(',', ':'))
+                decoded_json = json.dumps(decoded, sort_keys=True, separators=(',', ':'))
+                if caller_json != decoded_json:
+                    issues.append(
+                        ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            code="PAYLOAD_MISMATCH",
+                            message="Decoded signature payload does not match the supplied payload",
+                            path="signatures",
+                        )
+                    )
+                    score = 0
+                else:
+                    # Signature is valid and payload matches
+                    logger.debug("Signature verified successfully")
                 
             except jwt.InvalidSignatureError:
                 issues.append(
@@ -156,12 +172,12 @@ class SignatureValidator:
             issues.append(
                 ValidationIssue(
                     severity=ValidationSeverity.WARNING,
-                    code="NO_PUBLIC_KEY",
-                    message="Signature format valid but no public key provided for verification",
+                    code="UNVERIFIED_FORMAT_OK",
+                    message="Signature format valid but cryptographic verification not performed (no public key provided)",
                     path="signatures",
                 )
             )
-            score = 70  # Format is OK but not verified
+            score = 50  # Format-only: below success threshold
 
         # Ensure score doesn't go negative
         score = max(0, score)
