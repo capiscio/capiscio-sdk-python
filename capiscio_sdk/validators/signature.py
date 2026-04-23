@@ -96,7 +96,6 @@ class SignatureValidator:
         if public_key:
             try:
                 import jwt
-                import json
                 
                 # Verify signature
                 decoded = jwt.decode(
@@ -107,10 +106,7 @@ class SignatureValidator:
                 )
                 
                 # Bind: compare decoded payload against caller-supplied payload
-                # Use canonical JSON comparison to avoid ordering issues
-                caller_json = json.dumps(payload, sort_keys=True, separators=(',', ':'))
-                decoded_json = json.dumps(decoded, sort_keys=True, separators=(',', ':'))
-                if caller_json != decoded_json:
+                if decoded != payload:
                     issues.append(
                         ValidationIssue(
                             severity=ValidationSeverity.ERROR,
