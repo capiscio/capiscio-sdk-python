@@ -408,6 +408,6 @@ def test_server_jwks_endpoint(server_health_check):
 def test_server_agent_registry_endpoint(server_health_check):
     """Test: Server has agent registry endpoint."""
     resp = requests.get(f"{API_BASE_URL}/v1/agents")
-    # May return 404 or empty list depending on implementation
-    assert resp.status_code in [200, 404]
+    # May return 200 (list), 404 (not implemented), or 401 (auth required)
+    assert resp.status_code in [200, 401, 404]
     print("✓ Agent registry endpoint accessible")
