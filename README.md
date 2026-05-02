@@ -442,11 +442,14 @@ with CapiscioRPCClient() as client:
     claims, error = client.badge.parse_badge(token)
 
     # Request CA-signed badge
-    token, error = client.badge.request_badge(
+    success, result, error = client.badge.request_badge(
         agent_id="my-agent-123",
         api_key="capi_key_...",
         ca_url="https://registry.capisc.io"
     )
+    if success:
+        token = result["token"]
+        print(f"Badge expires: {result['expires_at']}")
 
     # Start badge keeper (auto-renewal)
     for event in client.badge.start_keeper(
@@ -456,8 +459,8 @@ with CapiscioRPCClient() as client:
         ttl_seconds=300,
         renew_before_seconds=60
     ):
-        if event.event_type == "renewed":
-            print(f"Badge renewed: {event.badge_token}")
+        if event["type"] == "renewed":
+            print(f"Badge renewed: {event['token']}")
 ```
 
 ### 2. DIDService - DID Parsing
@@ -470,22 +473,23 @@ with CapiscioRPCClient() as client:
     if did_info:
         print(f"Method: {did_info['method']}")          # "web"
         print(f"Domain: {did_info['domain']}")          # "registry.capisc.io"
-        print(f"Path: {did_info['path']}")              # "agents/my-agent"
-        print(f"Document URL: {did_info['document_url']}")  # "https://registry.capisc.io/agents/my-agent/did.json"
+        print(f"Path: {did_info['path']}")              # ["agents", "my-agent"]
+
+    # Get document URL (separate call)
+    url, error = client.did.document_url("did:web:registry.capisc.io:agents:my-agent")
+    print(f"Document URL: {url}")  # "https://registry.capisc.io/agents/my-agent/did.json"
 ```
 
 ### 3. TrustStoreService - Manage Trusted CA Keys
 
+> **Note**: `add_key()` is not yet implemented (raises `NotImplementedError`).
+> `is_trusted()` is available for checking trust status.
+
 ```python
 with CapiscioRPCClient() as client:
-    # Add trusted CA key
-    kid, error = client.trust.add_key(
-        did="did:web:registry.capisc.io",
-        public_key=b'{"kty":"OKP",...}',
-        format="JWK"
-    )
-
-    print(f"Added key: {kid}")
+    # Check if a DID is in the trust store
+    trusted = client.trust.is_trusted("did:web:registry.capisc.io")
+    print(f"Trusted: {trusted}")
 ```
 
 ### 4. RevocationService - Check Revocation Status
@@ -543,10 +547,9 @@ with CapiscioRPCClient() as client:
     )
 
     # Verify a signature
-    valid, payload, error = client.simpleguard.verify(
+    valid, key_id, error = client.simpleguard.verify(
+        payload=b"important message",
         signature=signature,
-        expected_payload=b"important message",
-        public_key_jwk='{"kty":"OKP",...}'
     )
 
     # Sign with attached payload (JWS Compact)
@@ -555,10 +558,9 @@ with CapiscioRPCClient() as client:
         key_id="my-key-1"
     )
 
-    # Verify attached signature
-    valid, payload, error = client.simpleguard.verify_attached(
+    # Verify attached signature (key resolved from JWS header)
+    valid, payload, key_id, error = client.simpleguard.verify_attached(
         jws=jws,
-        public_key_jwk='{"kty":"OKP",...}'
     )
 
     # Get key information
