@@ -442,11 +442,14 @@ with CapiscioRPCClient() as client:
     claims, error = client.badge.parse_badge(token)
 
     # Request CA-signed badge
-    token, error = client.badge.request_badge(
+    success, result, error = client.badge.request_badge(
         agent_id="my-agent-123",
         api_key="capi_key_...",
         ca_url="https://registry.capisc.io"
     )
+    if success:
+        token = result["token"]
+        print(f"Badge expires: {result['expires_at']}")
 
     # Start badge keeper (auto-renewal)
     for event in client.badge.start_keeper(
@@ -456,8 +459,8 @@ with CapiscioRPCClient() as client:
         ttl_seconds=300,
         renew_before_seconds=60
     ):
-        if event.event_type == "renewed":
-            print(f"Badge renewed: {event.badge_token}")
+        if event["type"] == "renewed":
+            print(f"Badge renewed: {event['token']}")
 ```
 
 ### 2. DIDService - DID Parsing
@@ -543,10 +546,9 @@ with CapiscioRPCClient() as client:
     )
 
     # Verify a signature
-    valid, payload, error = client.simpleguard.verify(
+    valid, key_id, error = client.simpleguard.verify(
+        payload=b"important message",
         signature=signature,
-        expected_payload=b"important message",
-        public_key_jwk='{"kty":"OKP",...}'
     )
 
     # Sign with attached payload (JWS Compact)
@@ -555,10 +557,9 @@ with CapiscioRPCClient() as client:
         key_id="my-key-1"
     )
 
-    # Verify attached signature
-    valid, payload, error = client.simpleguard.verify_attached(
+    # Verify attached signature (key resolved from JWS header)
+    valid, payload, key_id, error = client.simpleguard.verify_attached(
         jws=jws,
-        public_key_jwk='{"kty":"OKP",...}'
     )
 
     # Get key information
