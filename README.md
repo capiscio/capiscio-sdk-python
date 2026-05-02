@@ -473,22 +473,23 @@ with CapiscioRPCClient() as client:
     if did_info:
         print(f"Method: {did_info['method']}")          # "web"
         print(f"Domain: {did_info['domain']}")          # "registry.capisc.io"
-        print(f"Path: {did_info['path']}")              # "agents/my-agent"
-        print(f"Document URL: {did_info['document_url']}")  # "https://registry.capisc.io/agents/my-agent/did.json"
+        print(f"Path: {did_info['path']}")              # ["agents", "my-agent"]
+
+    # Get document URL (separate call)
+    url, error = client.did.document_url("did:web:registry.capisc.io:agents:my-agent")
+    print(f"Document URL: {url}")  # "https://registry.capisc.io/agents/my-agent/did.json"
 ```
 
 ### 3. TrustStoreService - Manage Trusted CA Keys
 
+> **Note**: `add_key()` is not yet implemented (raises `NotImplementedError`).
+> `is_trusted()` is available for checking trust status.
+
 ```python
 with CapiscioRPCClient() as client:
-    # Add trusted CA key
-    kid, error = client.trust.add_key(
-        did="did:web:registry.capisc.io",
-        public_key=b'{"kty":"OKP",...}',
-        format="JWK"
-    )
-
-    print(f"Added key: {kid}")
+    # Check if a DID is in the trust store
+    trusted = client.trust.is_trusted("did:web:registry.capisc.io")
+    print(f"Trusted: {trusted}")
 ```
 
 ### 4. RevocationService - Check Revocation Status
