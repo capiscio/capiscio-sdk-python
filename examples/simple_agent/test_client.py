@@ -17,7 +17,8 @@ Usage:
 import httpx
 import asyncio
 from datetime import datetime
-from a2a.types import Message, TextPart, Role, MessageSendParams
+from a2a.types import Message, Part, Role, SendMessageRequest
+from google.protobuf.json_format import MessageToDict
 
 
 async def send_message(client: httpx.AsyncClient, text: str, message_id: str = None):
@@ -28,16 +29,16 @@ async def send_message(client: httpx.AsyncClient, text: str, message_id: str = N
     # Create proper A2A message
     message = Message(
         message_id=message_id,
-        role=Role.user,
-        parts=[TextPart(text=text)]
+        role=Role.ROLE_USER,
+        parts=[Part(text=text)]
     )
     
-    # Wrap in MessageSendParams and serialize
-    params = MessageSendParams(message=message)
+    # Wrap in SendMessageRequest and serialize
+    params = SendMessageRequest(message=message)
     
     response = await client.post(
         "http://localhost:8080/v1/tasks",
-        json=params.model_dump(mode="json")
+        json=MessageToDict(params)
     )
     return response
 

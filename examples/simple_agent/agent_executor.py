@@ -8,7 +8,7 @@ security features.
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
-from a2a.utils import new_agent_text_message
+from a2a.types import Message, Part, Role
 
 
 class SimpleAgent:
@@ -69,7 +69,12 @@ class SimpleAgentExecutor(AgentExecutor):
         result = await self.agent.invoke(text or "hello")
         
         # Send response back to client
-        await event_queue.enqueue_event(new_agent_text_message(result))
+        response_msg = Message(
+            message_id="response",
+            role=Role.ROLE_AGENT,
+            parts=[Part(text=result)],
+        )
+        await event_queue.enqueue_event(response_msg)
     
     async def cancel(
         self,
@@ -84,6 +89,9 @@ class SimpleAgentExecutor(AgentExecutor):
             event_queue: Queue for sending events
         """
         # This simple agent doesn't support cancellation
-        await event_queue.enqueue_event(
-            new_agent_text_message("Task cancellation not supported by this simple agent.")
+        cancel_msg = Message(
+            message_id="cancel-response",
+            role=Role.ROLE_AGENT,
+            parts=[Part(text="Task cancellation not supported by this simple agent.")],
         )
+        await event_queue.enqueue_event(cancel_msg)
