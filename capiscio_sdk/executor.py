@@ -8,6 +8,13 @@ try:
 except ImportError:
     RequestContext = Any  # type: ignore[misc,assignment]
 
+try:
+    from google.protobuf.json_format import MessageToDict
+    from google.protobuf.message import Message as ProtobufMessage
+except ImportError:
+    MessageToDict = None  # type: ignore[assignment,misc]
+    ProtobufMessage = None  # type: ignore[assignment,misc]
+
 from .config import SecurityConfig
 from .validators import MessageValidator, ProtocolValidator
 from .infrastructure import ValidationCache, RateLimiter
@@ -86,7 +93,12 @@ class CapiscioSecurityExecutor:
             return
         
         # Convert message to dict for validation (our validators expect dict format)
-        message_dict = message.model_dump() if hasattr(message, 'model_dump') else {}
+        if hasattr(message, 'model_dump'):
+            message_dict = message.model_dump()
+        elif ProtobufMessage is not None and isinstance(message, ProtobufMessage):
+            message_dict = MessageToDict(message, preserving_proto_field_name=True)
+        else:
+            message_dict = {}
         
         # Extract identifier for rate limiting
         identifier = message_dict.get("message_id") or message.message_id
