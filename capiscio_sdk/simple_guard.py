@@ -481,7 +481,7 @@ class SimpleGuard:
 
     def make_delegation_headers(
         self,
-        chain: list,
+        chain: list[str],
         badge_map: Optional[Dict[str, str]] = None,
         payload: Optional[Dict[str, Any]] = None,
         body: Optional[bytes] = None,
