@@ -1607,6 +1607,7 @@ class MCPClient:
             mcp_pb2.MCP_DENY_REASON_TOOL_NOT_ALLOWED: "tool_not_allowed",
             mcp_pb2.MCP_DENY_REASON_ISSUER_UNTRUSTED: "issuer_untrusted",
             mcp_pb2.MCP_DENY_REASON_POLICY_DENIED: "policy_denied",
+            mcp_pb2.MCP_DENY_REASON_SCOPE_INSUFFICIENT: "scope_insufficient",
         }
         
         auth_level_map = {
@@ -1636,6 +1637,10 @@ class MCPClient:
             "evidence_json": response.evidence_json,
             "evidence_id": response.evidence_id,
             "timestamp": timestamp_str,
+            "error_code": response.error_code,
+            "rejection_detail": response.rejection_detail,
+            "requested_capability": response.requested_capability,
+            "presented_capability": response.presented_capability,
         }
     
     def verify_server_identity(

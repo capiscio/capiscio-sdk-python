@@ -6,7 +6,7 @@ from capiscio_sdk._rpc.gen.capiscio.v1 import mcp_pb2 as capiscio_dot_v1_dot_mcp
 
 
 class MCPServiceStub(object):
-    """MCPService provides unified MCP security operations (RFC-006 + RFC-007)
+    """MCPService provides unified MCP security operations (RFC-005, RFC-006, RFC-007)
     """
 
     def __init__(self, channel):
@@ -19,6 +19,11 @@ class MCPServiceStub(object):
                 '/capiscio.v1.MCPService/EvaluateToolAccess',
                 request_serializer=capiscio_dot_v1_dot_mcp__pb2.EvaluateToolAccessRequest.SerializeToString,
                 response_deserializer=capiscio_dot_v1_dot_mcp__pb2.EvaluateToolAccessResponse.FromString,
+                _registered_method=True)
+        self.EvaluatePolicyDecision = channel.unary_unary(
+                '/capiscio.v1.MCPService/EvaluatePolicyDecision',
+                request_serializer=capiscio_dot_v1_dot_mcp__pb2.PolicyDecisionRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_mcp__pb2.PolicyDecisionResponse.FromString,
                 _registered_method=True)
         self.VerifyServerIdentity = channel.unary_unary(
                 '/capiscio.v1.MCPService/VerifyServerIdentity',
@@ -38,12 +43,24 @@ class MCPServiceStub(object):
 
 
 class MCPServiceServicer(object):
-    """MCPService provides unified MCP security operations (RFC-006 + RFC-007)
+    """MCPService provides unified MCP security operations (RFC-005, RFC-006, RFC-007)
     """
 
     def EvaluateToolAccess(self, request, context):
         """RFC-006: Evaluate tool access and emit evidence atomically
         Single RPC returns both decision and evidence to avoid partial failures
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def EvaluatePolicyDecision(self, request, context):
+        """RFC-005: Centralized policy decision via PDP
+        Go core owns decision logic, cache, break-glass, telemetry.
+        SDK callers own obligation execution and response propagation.
+        NEVER returns an RPC error for PDP unreachability — encodes the outcome
+        in the response (ALLOW_OBSERVE + error_code) so SDKs don't need to
+        distinguish transport errors from policy outcomes.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -78,6 +95,11 @@ def add_MCPServiceServicer_to_server(servicer, server):
                     request_deserializer=capiscio_dot_v1_dot_mcp__pb2.EvaluateToolAccessRequest.FromString,
                     response_serializer=capiscio_dot_v1_dot_mcp__pb2.EvaluateToolAccessResponse.SerializeToString,
             ),
+            'EvaluatePolicyDecision': grpc.unary_unary_rpc_method_handler(
+                    servicer.EvaluatePolicyDecision,
+                    request_deserializer=capiscio_dot_v1_dot_mcp__pb2.PolicyDecisionRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_mcp__pb2.PolicyDecisionResponse.SerializeToString,
+            ),
             'VerifyServerIdentity': grpc.unary_unary_rpc_method_handler(
                     servicer.VerifyServerIdentity,
                     request_deserializer=capiscio_dot_v1_dot_mcp__pb2.VerifyServerIdentityRequest.FromString,
@@ -102,7 +124,7 @@ def add_MCPServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class MCPService(object):
-    """MCPService provides unified MCP security operations (RFC-006 + RFC-007)
+    """MCPService provides unified MCP security operations (RFC-005, RFC-006, RFC-007)
     """
 
     @staticmethod
@@ -122,6 +144,33 @@ class MCPService(object):
             '/capiscio.v1.MCPService/EvaluateToolAccess',
             capiscio_dot_v1_dot_mcp__pb2.EvaluateToolAccessRequest.SerializeToString,
             capiscio_dot_v1_dot_mcp__pb2.EvaluateToolAccessResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def EvaluatePolicyDecision(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.MCPService/EvaluatePolicyDecision',
+            capiscio_dot_v1_dot_mcp__pb2.PolicyDecisionRequest.SerializeToString,
+            capiscio_dot_v1_dot_mcp__pb2.PolicyDecisionResponse.FromString,
             options,
             channel_credentials,
             insecure,
