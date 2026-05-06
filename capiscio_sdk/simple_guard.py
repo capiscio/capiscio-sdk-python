@@ -364,3 +364,155 @@ class SimpleGuard:
             # (signing key is loaded separately during guard initialization)
             if self_trust_path.exists():
                 self._client.simpleguard.load_key(str(self_trust_path))
+
+    # =========================================================================
+    # RFC-008: Authority Envelope Operations
+    # =========================================================================
+
+    def create_envelope(
+        self,
+        subject_did: str,
+        capability_class: str,
+        delegation_depth_remaining: int = 1,
+        issuer_badge_jti: str = "",
+        txn_id: str = "",
+        expires_in_seconds: int = 3600,
+        constraints: Optional[Dict[str, Any]] = None,
+        subject_badge_jti: str = "",
+        enforcement_mode_min: str = "",
+    ) -> str:
+        """
+        Create a root Authority Envelope delegating authority to another agent (RFC-008 §6.1).
+
+        The envelope is signed with this agent's key and authorizes `subject_did`
+        to act within the specified capability class.
+
+        Args:
+            subject_did: DID of the agent receiving delegated authority.
+            capability_class: Dot-notation capability (e.g., "tools.database.read").
+            delegation_depth_remaining: How many further delegations allowed (default: 1).
+            issuer_badge_jti: JTI of the issuer's badge (optional).
+            txn_id: Transaction ID (auto-generated if empty).
+            expires_in_seconds: TTL from now (default: 3600).
+            constraints: Optional constraints dict (JSON-serializable).
+            subject_badge_jti: JTI of the subject's badge (optional).
+            enforcement_mode_min: Minimum enforcement mode (optional).
+
+        Returns:
+            JWS Compact Serialization string of the signed envelope.
+
+        Raises:
+            ConfigurationError: If signing fails or key is not available.
+        """
+        constraints_json = json.dumps(constraints) if constraints else ""
+
+        jws, env_id, issuer_did, err = self._client.simpleguard.create_envelope(
+            key_id=self.signing_kid,
+            subject_did=subject_did,
+            capability_class=capability_class,
+            delegation_depth_remaining=delegation_depth_remaining,
+            txn_id=txn_id,
+            expires_in_seconds=expires_in_seconds,
+            constraints_json=constraints_json,
+            issuer_badge_jti=issuer_badge_jti,
+            subject_badge_jti=subject_badge_jti,
+            enforcement_mode_min=enforcement_mode_min,
+        )
+        if err:
+            raise ConfigurationError(f"Failed to create envelope: {err}")
+        logger.info(
+            "Created root envelope %s (issuer=%s, subject=%s, capability=%s)",
+            env_id, issuer_did, subject_did, capability_class,
+        )
+        return jws
+
+    def derive_envelope(
+        self,
+        parent_envelope_jws: str,
+        subject_did: str,
+        capability_class: str,
+        delegation_depth_remaining: int = 0,
+        issuer_badge_jti: str = "",
+        expires_in_seconds: int = 1800,
+        constraints: Optional[Dict[str, Any]] = None,
+        subject_badge_jti: str = "",
+        enforcement_mode_min: str = "",
+    ) -> str:
+        """
+        Derive a child Authority Envelope from a parent (RFC-008 §6.3).
+
+        Creates a hash-linked child with monotonic narrowing validation.
+
+        Args:
+            parent_envelope_jws: The parent envelope JWS to derive from.
+            subject_did: DID of the next delegate.
+            capability_class: Must be equal or narrower than parent's capability.
+            delegation_depth_remaining: Must be < parent's depth (default: 0 = no further delegation).
+            issuer_badge_jti: JTI of the child issuer's own badge (optional).
+            expires_in_seconds: TTL from now (default: 1800).
+            constraints: Must be equal or more restrictive than parent's.
+            subject_badge_jti: JTI of the subject's badge (optional).
+            enforcement_mode_min: Minimum enforcement mode (optional, inherited from parent if not set).
+
+        Returns:
+            JWS Compact Serialization string of the signed child envelope.
+
+        Raises:
+            ConfigurationError: On narrowing violation, depth exceeded, or signing failure.
+        """
+        constraints_json = json.dumps(constraints) if constraints else ""
+
+        jws, env_id, parent_hash, err = self._client.simpleguard.derive_envelope(
+            parent_envelope_jws=parent_envelope_jws,
+            key_id=self.signing_kid,
+            subject_did=subject_did,
+            capability_class=capability_class,
+            delegation_depth_remaining=delegation_depth_remaining,
+            expires_in_seconds=expires_in_seconds,
+            constraints_json=constraints_json,
+            issuer_badge_jti=issuer_badge_jti,
+            subject_badge_jti=subject_badge_jti,
+            enforcement_mode_min=enforcement_mode_min,
+        )
+        if err:
+            raise ConfigurationError(f"Failed to derive envelope: {err}")
+        logger.info("Derived child envelope %s (parent_hash=%s)", env_id, parent_hash)
+        return jws
+
+    def make_delegation_headers(
+        self,
+        chain: list,
+        badge_map: Optional[Dict[str, str]] = None,
+        payload: Optional[Dict[str, Any]] = None,
+        body: Optional[bytes] = None,
+    ) -> Dict[str, str]:
+        """
+        Generate HTTP headers for a delegated request (RFC-008 §15.1–§15.3).
+
+        Combines the delegation chain headers with the standard badge header.
+
+        Args:
+            chain: Ordered list of envelope JWS strings [root, ..., leaf].
+            badge_map: DID → badge JWS for intermediate agents in the chain.
+            payload: Optional payload for badge signing (if badge_token not set).
+            body: Optional HTTP body bytes to bind to badge signature.
+
+        Returns:
+            Dict with X-Capiscio-Badge, X-Capiscio-Authority,
+            X-Capiscio-Authority-Chain, and optionally X-Capiscio-Badge-Map headers.
+        """
+        # Get badge header
+        badge_headers = self.make_headers(payload or {}, body=body)
+
+        # Get chain transport headers via gRPC
+        authority, chain_header, badge_map_header, err = \
+            self._client.simpleguard.build_transport_headers(chain, badge_map or {})
+        if err:
+            raise ConfigurationError(f"Failed to build transport headers: {err}")
+
+        headers = {**badge_headers}
+        headers["X-Capiscio-Authority"] = authority
+        headers["X-Capiscio-Authority-Chain"] = chain_header
+        if badge_map_header:
+            headers["X-Capiscio-Badge-Map"] = badge_map_header
+        return headers

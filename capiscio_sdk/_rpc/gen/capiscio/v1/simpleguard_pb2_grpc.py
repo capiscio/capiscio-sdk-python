@@ -60,6 +60,26 @@ class SimpleGuardServiceStub(object):
                 request_serializer=capiscio_dot_v1_dot_simpleguard__pb2.InitRequest.SerializeToString,
                 response_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.InitResponse.FromString,
                 _registered_method=True)
+        self.CreateEnvelope = channel.unary_unary(
+                '/capiscio.v1.SimpleGuardService/CreateEnvelope',
+                request_serializer=capiscio_dot_v1_dot_simpleguard__pb2.CreateEnvelopeRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.CreateEnvelopeResponse.FromString,
+                _registered_method=True)
+        self.DeriveEnvelope = channel.unary_unary(
+                '/capiscio.v1.SimpleGuardService/DeriveEnvelope',
+                request_serializer=capiscio_dot_v1_dot_simpleguard__pb2.DeriveEnvelopeRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.DeriveEnvelopeResponse.FromString,
+                _registered_method=True)
+        self.BuildTransportHeaders = channel.unary_unary(
+                '/capiscio.v1.SimpleGuardService/BuildTransportHeaders',
+                request_serializer=capiscio_dot_v1_dot_simpleguard__pb2.BuildTransportHeadersRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.BuildTransportHeadersResponse.FromString,
+                _registered_method=True)
+        self.VerifyEnvelopeChain = channel.unary_unary(
+                '/capiscio.v1.SimpleGuardService/VerifyEnvelopeChain',
+                request_serializer=capiscio_dot_v1_dot_simpleguard__pb2.VerifyEnvelopeChainRequest.SerializeToString,
+                response_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.VerifyEnvelopeChainResponse.FromString,
+                _registered_method=True)
 
 
 class SimpleGuardServiceServicer(object):
@@ -130,6 +150,34 @@ class SimpleGuardServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def CreateEnvelope(self, request, context):
+        """RFC-008: Create a root Authority Envelope (§6.1)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeriveEnvelope(self, request, context):
+        """RFC-008: Derive a child Authority Envelope from a parent (§6.3)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def BuildTransportHeaders(self, request, context):
+        """RFC-008: Build transport headers for a delegation chain (§15.1–§15.3)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def VerifyEnvelopeChain(self, request, context):
+        """RFC-008: Verify an Authority Envelope chain (§9.2)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_SimpleGuardServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -177,6 +225,26 @@ def add_SimpleGuardServiceServicer_to_server(servicer, server):
                     servicer.Init,
                     request_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.InitRequest.FromString,
                     response_serializer=capiscio_dot_v1_dot_simpleguard__pb2.InitResponse.SerializeToString,
+            ),
+            'CreateEnvelope': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateEnvelope,
+                    request_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.CreateEnvelopeRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_simpleguard__pb2.CreateEnvelopeResponse.SerializeToString,
+            ),
+            'DeriveEnvelope': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeriveEnvelope,
+                    request_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.DeriveEnvelopeRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_simpleguard__pb2.DeriveEnvelopeResponse.SerializeToString,
+            ),
+            'BuildTransportHeaders': grpc.unary_unary_rpc_method_handler(
+                    servicer.BuildTransportHeaders,
+                    request_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.BuildTransportHeadersRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_simpleguard__pb2.BuildTransportHeadersResponse.SerializeToString,
+            ),
+            'VerifyEnvelopeChain': grpc.unary_unary_rpc_method_handler(
+                    servicer.VerifyEnvelopeChain,
+                    request_deserializer=capiscio_dot_v1_dot_simpleguard__pb2.VerifyEnvelopeChainRequest.FromString,
+                    response_serializer=capiscio_dot_v1_dot_simpleguard__pb2.VerifyEnvelopeChainResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -423,6 +491,114 @@ class SimpleGuardService(object):
             '/capiscio.v1.SimpleGuardService/Init',
             capiscio_dot_v1_dot_simpleguard__pb2.InitRequest.SerializeToString,
             capiscio_dot_v1_dot_simpleguard__pb2.InitResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateEnvelope(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.SimpleGuardService/CreateEnvelope',
+            capiscio_dot_v1_dot_simpleguard__pb2.CreateEnvelopeRequest.SerializeToString,
+            capiscio_dot_v1_dot_simpleguard__pb2.CreateEnvelopeResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeriveEnvelope(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.SimpleGuardService/DeriveEnvelope',
+            capiscio_dot_v1_dot_simpleguard__pb2.DeriveEnvelopeRequest.SerializeToString,
+            capiscio_dot_v1_dot_simpleguard__pb2.DeriveEnvelopeResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def BuildTransportHeaders(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.SimpleGuardService/BuildTransportHeaders',
+            capiscio_dot_v1_dot_simpleguard__pb2.BuildTransportHeadersRequest.SerializeToString,
+            capiscio_dot_v1_dot_simpleguard__pb2.BuildTransportHeadersResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def VerifyEnvelopeChain(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/capiscio.v1.SimpleGuardService/VerifyEnvelopeChain',
+            capiscio_dot_v1_dot_simpleguard__pb2.VerifyEnvelopeChainRequest.SerializeToString,
+            capiscio_dot_v1_dot_simpleguard__pb2.VerifyEnvelopeChainResponse.FromString,
             options,
             channel_credentials,
             insecure,
