@@ -1638,6 +1638,7 @@ class MCPClient:
             "evidence_id": response.evidence_id,
             "timestamp": timestamp_str,
             "error_code": response.error_code,
+            "rejection_detail": response.rejection_detail,
             "requested_capability": response.requested_capability,
             "presented_capability": response.presented_capability,
         }
