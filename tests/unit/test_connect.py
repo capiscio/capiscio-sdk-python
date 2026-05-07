@@ -258,8 +258,42 @@ class TestCapiscIOConnect:
                 mock_connect.assert_called_once()
                 assert result == mock_identity
 
+    def test_connect_reads_api_key_from_env(self):
+        """Test connect() reads CAPISCIO_API_KEY from env when not passed."""
+        with patch.dict(os.environ, {"CAPISCIO_API_KEY": "sk_from_env"}, clear=False):
+            with patch.object(_Connector, "__init__", return_value=None) as mock_init:
+                with patch.object(_Connector, "connect", return_value=MagicMock()):
+                    CapiscIO.connect()
+                    call_kwargs = mock_init.call_args[1]
+                    assert call_kwargs["api_key"] == "sk_from_env"
 
-class TestCapiscIOFromEnv:
+    def test_connect_raises_without_api_key(self):
+        """Test connect() raises ValueError when no api_key and no env var."""
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("CAPISCIO_API_KEY", None)
+            with pytest.raises(ValueError, match="api_key is required"):
+                CapiscIO.connect()
+
+    def test_connect_server_url_falls_back_to_prod(self):
+        """Test connect() uses PROD_REGISTRY when CAPISCIO_SERVER_URL is empty."""
+        with patch.dict(os.environ, {"CAPISCIO_API_KEY": "sk_test", "CAPISCIO_SERVER_URL": ""}, clear=False):
+            with patch.object(_Connector, "__init__", return_value=None) as mock_init:
+                with patch.object(_Connector, "connect", return_value=MagicMock()):
+                    CapiscIO.connect()
+                    call_kwargs = mock_init.call_args[1]
+                    assert call_kwargs["server_url"] == PROD_REGISTRY
+
+    def test_connect_reads_server_url_from_env(self):
+        """Test connect() reads CAPISCIO_SERVER_URL from env."""
+        with patch.dict(os.environ, {
+            "CAPISCIO_API_KEY": "sk_test",
+            "CAPISCIO_SERVER_URL": "https://custom.server.io",
+        }, clear=False):
+            with patch.object(_Connector, "__init__", return_value=None) as mock_init:
+                with patch.object(_Connector, "connect", return_value=MagicMock()):
+                    CapiscIO.connect()
+                    call_kwargs = mock_init.call_args[1]
+                    assert call_kwargs["server_url"] == "https://custom.server.io"
     """Tests for CapiscIO.from_env() class method."""
 
     def test_from_env_requires_api_key(self):
@@ -268,7 +302,7 @@ class TestCapiscIOFromEnv:
             # Remove the key if it exists
             os.environ.pop("CAPISCIO_API_KEY", None)
             
-            with pytest.raises(ValueError, match="CAPISCIO_API_KEY environment variable is required"):
+            with pytest.raises(ValueError, match="CAPISCIO_API_KEY"):
                 CapiscIO.from_env()
 
     def test_from_env_reads_env_vars(self):
@@ -288,10 +322,7 @@ class TestCapiscIOFromEnv:
                 CapiscIO.from_env()
                 
                 mock_connect.assert_called_once_with(
-                    api_key="sk_test_env",
-                    agent_id="env-agent-id",
                     name="Env Agent",
-                    server_url="https://env.server.com",
                     dev_mode=True,
                 )
 
@@ -308,10 +339,7 @@ class TestCapiscIOFromEnv:
                 CapiscIO.from_env()
                 
                 mock_connect.assert_called_once_with(
-                    api_key="sk_test_only",
-                    agent_id=None,
                     name=None,
-                    server_url=PROD_REGISTRY,
                     dev_mode=False,
                 )
 
