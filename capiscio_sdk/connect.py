@@ -322,7 +322,7 @@ class CapiscIO:
         if agent_id is None:
             agent_id = os.environ.get("CAPISCIO_AGENT_ID")
         if server_url is None:
-            server_url = os.environ.get("CAPISCIO_SERVER_URL", PROD_REGISTRY)
+            server_url = os.environ.get("CAPISCIO_SERVER_URL") or PROD_REGISTRY
 
         connector = _Connector(
             api_key=api_key,
