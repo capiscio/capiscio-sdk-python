@@ -268,7 +268,7 @@ class TestCapiscIOFromEnv:
             # Remove the key if it exists
             os.environ.pop("CAPISCIO_API_KEY", None)
             
-            with pytest.raises(ValueError, match="CAPISCIO_API_KEY environment variable is required"):
+            with pytest.raises(ValueError, match="CAPISCIO_API_KEY"):
                 CapiscIO.from_env()
 
     def test_from_env_reads_env_vars(self):
@@ -288,10 +288,7 @@ class TestCapiscIOFromEnv:
                 CapiscIO.from_env()
                 
                 mock_connect.assert_called_once_with(
-                    api_key="sk_test_env",
-                    agent_id="env-agent-id",
                     name="Env Agent",
-                    server_url="https://env.server.com",
                     dev_mode=True,
                 )
 
@@ -308,10 +305,7 @@ class TestCapiscIOFromEnv:
                 CapiscIO.from_env()
                 
                 mock_connect.assert_called_once_with(
-                    api_key="sk_test_only",
-                    agent_id=None,
                     name=None,
-                    server_url=PROD_REGISTRY,
                     dev_mode=False,
                 )
 

@@ -263,11 +263,11 @@ class CapiscIO:
     @classmethod
     def connect(
         cls,
-        api_key: str,
+        api_key: Optional[str] = None,
         *,
         name: Optional[str] = None,
         agent_id: Optional[str] = None,
-        server_url: str = PROD_REGISTRY,
+        server_url: Optional[str] = None,
         keys_dir: Optional[Path] = None,
         auto_badge: bool = True,
         dev_mode: bool = False,
@@ -285,10 +285,13 @@ class CapiscIO:
         5. Sets up auto-renewal
         
         Args:
-            api_key: Your CapiscIO API key (sk_live_... or sk_test_...)
+            api_key: Your CapiscIO API key (sk_live_... or sk_test_...).
+                Falls back to CAPISCIO_API_KEY env var if not provided.
             name: Agent name (auto-generated if omitted)
-            agent_id: Specific agent ID to use (auto-discovered if omitted)
-            server_url: Registry server URL (default: production)
+            agent_id: Specific agent ID to use (auto-discovered if omitted).
+                Falls back to CAPISCIO_AGENT_ID env var if not provided.
+            server_url: Registry server URL.
+                Falls back to CAPISCIO_SERVER_URL env var, then production default.
             keys_dir: Directory for keys (default: ~/.capiscio/keys/{agent_id}/)
             auto_badge: Whether to automatically request a badge
             dev_mode: Use self-signed badges (Trust Level 0)
@@ -299,10 +302,28 @@ class CapiscIO:
             AgentIdentity with full credentials and methods
             
         Example:
+            # Explicit API key
             agent = CapiscIO.connect(api_key="sk_live_abc123")
+            
+            # From environment (CAPISCIO_API_KEY)
+            agent = CapiscIO.connect()
+            
             print(f"Agent DID: {agent.did}")
             agent.emit("agent_started", {"version": "1.0"})
         """
+        if api_key is None:
+            api_key = os.environ.get("CAPISCIO_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "api_key is required. Pass it directly or set the "
+                "CAPISCIO_API_KEY environment variable. "
+                "Get your API key at https://app.capisc.io"
+            )
+        if agent_id is None:
+            agent_id = os.environ.get("CAPISCIO_AGENT_ID")
+        if server_url is None:
+            server_url = os.environ.get("CAPISCIO_SERVER_URL", PROD_REGISTRY)
+
         connector = _Connector(
             api_key=api_key,
             name=name,
@@ -329,19 +350,13 @@ class CapiscIO:
         - CAPISCIO_DEV_MODE (optional, default: false)
         - CAPISCIO_AGENT_PRIVATE_KEY_JWK (optional — JSON-encoded Ed25519
           private JWK for ephemeral environments; printed on first generation)
-        """
-        api_key = os.environ.get("CAPISCIO_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "CAPISCIO_API_KEY environment variable is required. "
-                "Get your API key at https://app.capisc.io"
-            )
         
+        Note: connect() also reads CAPISCIO_API_KEY, CAPISCIO_AGENT_ID, and
+        CAPISCIO_SERVER_URL from the environment when not passed explicitly.
+        from_env() additionally reads CAPISCIO_AGENT_NAME and CAPISCIO_DEV_MODE.
+        """
         return cls.connect(
-            api_key=api_key,
-            agent_id=os.environ.get("CAPISCIO_AGENT_ID"),
             name=os.environ.get("CAPISCIO_AGENT_NAME"),
-            server_url=os.environ.get("CAPISCIO_SERVER_URL", PROD_REGISTRY),
             dev_mode=os.environ.get("CAPISCIO_DEV_MODE", "").lower() in ("true", "1", "yes"),
             **kwargs,
         )
