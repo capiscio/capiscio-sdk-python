@@ -136,18 +136,20 @@ class EventEmitter:
         if not self.enabled:
             return False
         
+        # Build a flat event matching the registry's db.Event struct.
+        # See capiscio-server internal/db/models.go for JSON field tags.
         event = {
             "id": str(uuid.uuid4()),
-            "type": event_type,
             "agentId": self.agent_id,
+            "traceId": correlation_id or str(uuid.uuid4()),
+            "eventType": event_type,
+            "severity": "info",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "data": data or {},
+            "payload": data or {},
         }
         
         if task_id:
-            event["taskId"] = task_id
-        if correlation_id:
-            event["correlationId"] = correlation_id
+            event["payload"]["task_id"] = task_id
         
         with self._batch_lock:
             self._batch.append(event)
@@ -189,22 +191,30 @@ class EventEmitter:
                 "X-Capiscio-Registry-Key": self.api_key,
             }
             
-            # Send batch
-            response = self._client.post(
-                f"{self.server_url}/v1/events",
-                headers=headers,
-                json={"events": events_to_send},
-            )
+            # The registry decodes the POST body as a flat db.Event struct.
+            # Send each event individually.
+            failed: list = []
+            for event in events_to_send:
+                try:
+                    response = self._client.post(
+                        f"{self.server_url}/v1/events",
+                        headers=headers,
+                        json=event,
+                    )
+                    if response.status_code not in (200, 201, 202):
+                        logger.warning(f"Failed to send event: {response.status_code} {response.text[:200]}")
+                        failed.append(event)
+                except Exception as e:
+                    logger.error(f"Error sending event: {e}")
+                    failed.append(event)
             
-            if response.status_code in (200, 201, 202):
-                logger.debug(f"Sent {len(events_to_send)} events")
-                return True
-            else:
-                logger.warning(f"Failed to send events: {response.status_code} {response.text}")
-                # Re-queue events on failure
+            if failed:
                 with self._batch_lock:
-                    self._batch.extend(events_to_send)
+                    self._batch.extend(failed)
                 return False
+            
+            logger.debug(f"Sent {len(events_to_send)} events")
+            return True
                 
         except Exception as e:
             logger.error(f"Error sending events: {e}")
