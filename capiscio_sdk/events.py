@@ -145,7 +145,7 @@ class EventEmitter:
             "eventType": event_type,
             "severity": "info",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "payload": data or {},
+            "payload": dict(data) if data else {},
         }
         
         if task_id:
