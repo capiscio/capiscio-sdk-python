@@ -845,7 +845,8 @@ class TestConnector:
         
         result = connector._init_identity()
         
-        assert result == "did:key:z6MkExisting"
+        # With server_url + agent_id set, the code prefers did:web over the did:key in the JWK kid
+        assert result == "did:web:test.server.com:agents:agent-123"
 
     def test_init_identity_calls_rpc(self, tmp_path):
         """Test _init_identity calls capiscio-core RPC."""

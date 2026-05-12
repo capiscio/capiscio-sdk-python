@@ -98,6 +98,12 @@ def _did_method(did: str) -> str:
     return parts[1] if len(parts) >= 3 else ""
 
 
+def _is_did_transition(did_a: str, did_b: str) -> bool:
+    """Return True if the two DIDs represent a safe did:key ↔ did:web transition."""
+    methods = {_did_method(did_a), _did_method(did_b)}
+    return methods == {"key", "web"}
+
+
 def _read_did_from_keys(identity_path: Path) -> Optional[str]:
     """
     Read DID from an identity directory.
@@ -562,7 +568,7 @@ class _Connector:
                                         return agent_data
                                 # did:key ↔ did:web transitions are expected when
                                 # server upgrades DID method; agent_id already confirms identity.
-                                if _did_method(local_did) != _did_method(server_did):
+                                if _is_did_transition(local_did, server_did):
                                     logger.debug(f"DID method transition for {agent_id}: {local_did} → {server_did}")
                                     if not self.name or agent_data.get("name") == self.name:
                                         return agent_data
@@ -609,7 +615,7 @@ class _Connector:
                             if server_did and local_did and server_did != local_did:
                                 # did:key ↔ did:web transitions are expected when
                                 # server upgrades DID method; agent_id already confirms identity.
-                                if _did_method(local_did) != _did_method(server_did):
+                                if _is_did_transition(local_did, server_did):
                                     logger.debug(f"DID method transition for {agent_id}: {local_did} → {server_did}")
                                 else:
                                     logger.warning(f"DID mismatch for {agent_id}: local={local_did}, server={server_did}")
