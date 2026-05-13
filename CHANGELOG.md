@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-05-13
+
+### Added
+- **Authority Envelope SDK wrappers** for RFC-008 (#60)
+- **Structured rejection fields** surfaced from gRPC response (#61)
+- **DID:web derivation**: handle did:key → did:web transitions (#66)
+- **API key fallback**: `connect()` reads `CAPISCIO_API_KEY` env var (#62)
+
+### Fixed
+- A2A v1.0 protobuf compatibility for executor and message validator (#67)
+- Migrate to a2a-sdk v1.0 protobuf types (#59)
+- Align EventEmitter with server `db.Event` struct (#63)
+- SDK hardening: signature validation, JWS strict parsing (#55)
+- Trust level mapping and `get_agent` implementation (#53)
+- Remove private key from log output (#52)
+- PID-specific Unix socket path and stale socket cleanup (#51)
+- SHA-256 checksum verification with fail-closed mode
+- Pin CORE_VERSION to 2.7.0
+
 ## [2.6.0] - 2026-03-27
 
 ### Added
