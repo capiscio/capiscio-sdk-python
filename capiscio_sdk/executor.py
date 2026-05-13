@@ -92,16 +92,21 @@ class CapiscioSecurityExecutor:
             await self.delegate.execute(context, event_queue)
             return
         
-        # Convert message to dict for validation (our validators expect dict format)
+        # Convert message to dict for validation using ProtoJSON conventions
+        # (camelCase fields, SCREAMING_SNAKE_CASE enums per A2A v1 ADR-001)
         if hasattr(message, 'model_dump'):
             message_dict = message.model_dump()
         elif ProtobufMessage is not None and isinstance(message, ProtobufMessage):
-            message_dict = MessageToDict(message, preserving_proto_field_name=True)
+            message_dict = MessageToDict(message, always_print_fields_with_no_presence=True)
         else:
             message_dict = {}
         
         # Extract identifier for rate limiting
-        identifier = message_dict.get("message_id") or message.message_id
+        identifier = (
+            message_dict.get("messageId")
+            or getattr(message, "message_id", None)
+            or getattr(message, "messageId", None)
+        )
         
         # Check rate limit
         if self._rate_limiter and identifier:

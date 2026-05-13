@@ -11,11 +11,11 @@ def validator():
 
 @pytest.fixture
 def valid_message():
-    """Create a valid test message (per official A2A spec)."""
+    """Create a valid test message (per A2A v1 ProtoJSON spec)."""
     return {
         "messageId": "msg_123",
-        "role": "user",
-        "parts": [{"kind": "text", "text": "Hello, world!"}],
+        "role": "ROLE_USER",
+        "parts": [{"text": "Hello, world!"}],
     }
 
 
@@ -70,7 +70,7 @@ def test_validate_missing_role(validator, valid_message):
 
 def test_validate_valid_agent_role(validator, valid_message):
     """Test validation with valid agent role."""
-    valid_message["role"] = "agent"
+    valid_message["role"] = "ROLE_AGENT"
     result = validator.validate(valid_message)
     assert result.success
     assert result.compliance.total == 100
@@ -92,33 +92,31 @@ def test_validate_empty_parts(validator, valid_message):
     assert any(i.code == "EMPTY_ARRAY" for i in result.warnings)
 
 
-def test_validate_part_missing_kind(validator, valid_message):
-    """Test validation with part missing kind field."""
+def test_validate_part_with_text_content(validator, valid_message):
+    """Test validation with valid text part (A2A v1 oneof content)."""
     valid_message["parts"] = [{"text": "Hello"}]
     result = validator.validate(valid_message)
-    assert not result.success
-    assert any(i.code == "MISSING_FIELD" and "kind" in i.path for i in result.errors)
+    assert result.success
 
 
-def test_validate_part_unknown_kind(validator, valid_message):
-    """Test validation with unknown part kind."""
-    valid_message["parts"] = [{"kind": "unknown_type", "text": "Hello"}]
-    result = validator.validate(valid_message)
-    assert result.success  # Unknown kind is just a warning
-    assert any(i.code == "UNKNOWN_TYPE" for i in result.warnings)
-
-
-def test_validate_text_part_missing_text(validator, valid_message):
-    """Test validation with TextPart missing text field."""
-    valid_message["parts"] = [{"kind": "text"}]
+def test_validate_part_missing_content(validator, valid_message):
+    """Test validation with part missing all oneof content fields."""
+    valid_message["parts"] = [{"metadata": {}}]  # No text/raw/url/data
     result = validator.validate(valid_message)
     assert not result.success
-    assert any(i.code == "MISSING_FIELD" and "text" in i.path for i in result.errors)
+    assert any(i.code == "MISSING_FIELD" for i in result.errors)
+
+
+def test_validate_url_part(validator, valid_message):
+    """Test validation with valid URL part."""
+    valid_message["parts"] = [{"url": "https://example.com/file.txt"}]
+    result = validator.validate(valid_message)
+    assert result.success
 
 
 def test_validate_data_part_valid(validator, valid_message):
-    """Test validation with valid DataPart."""
-    valid_message["parts"] = [{"kind": "data", "data": {"key": "value"}}]
+    """Test validation with valid data part (A2A v1 oneof)."""
+    valid_message["parts"] = [{"data": {"key": "value"}}]
     result = validator.validate(valid_message)
     assert result.success
 

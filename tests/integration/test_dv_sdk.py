@@ -3,12 +3,24 @@
 import os
 
 import pytest
+import requests
 
 from capiscio_sdk.dv import create_dv_order, finalize_dv_order, get_dv_order
 
 
 # Test configuration
 TEST_SERVER_URL = os.getenv("CAPISCIO_TEST_SERVER", "http://localhost:8080")
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _require_server():
+    """Skip all tests if server is not available."""
+    try:
+        resp = requests.get(f"{TEST_SERVER_URL}/health", timeout=2)
+        if resp.status_code != 200:
+            pytest.skip(f"Server not healthy at {TEST_SERVER_URL}")
+    except requests.exceptions.RequestException:
+        pytest.skip(f"Server not available at {TEST_SERVER_URL}")
 
 
 @pytest.fixture
