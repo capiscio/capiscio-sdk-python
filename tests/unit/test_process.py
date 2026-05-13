@@ -104,38 +104,59 @@ class TestProcessManager:
         """Test find_binary finds binary in system PATH."""
         pm = ProcessManager()
         
+        original_exists = Path.exists
+        def mock_exists(self):
+            if "capiscio-core" in str(self) and "bin" in str(self):
+                return False
+            return original_exists(self)
+        
         with patch.dict(os.environ, {}, clear=True):
-            with patch("shutil.which", return_value="/usr/local/bin/capiscio-core"):
-                result = pm.find_binary()
-                assert result == Path("/usr/local/bin/capiscio-core")
+            with patch.object(Path, "exists", mock_exists):
+                with patch("shutil.which", return_value="/usr/local/bin/capiscio-core"):
+                    result = pm.find_binary()
+                    assert result == Path("/usr/local/bin/capiscio-core")
 
     def test_find_binary_cached(self):
         """Test find_binary finds previously downloaded binary."""
         pm = ProcessManager()
         
+        original_exists = Path.exists
+        def mock_exists(self):
+            if "capiscio-core" in str(self) and "bin" in str(self):
+                return False
+            return original_exists(self)
+        
         with patch.dict(os.environ, {}, clear=True):
-            with patch("shutil.which", return_value=None):
-                with patch.object(ProcessManager, "_get_cached_binary_path") as mock_cached:
-                    mock_path = MagicMock()
-                    mock_path.exists.return_value = True
-                    mock_cached.return_value = mock_path
-                    
-                    result = pm.find_binary()
-                    assert result == mock_path
+            with patch.object(Path, "exists", mock_exists):
+                with patch("shutil.which", return_value=None):
+                    with patch.object(ProcessManager, "_get_cached_binary_path") as mock_cached:
+                        mock_path = MagicMock()
+                        mock_path.exists.return_value = True
+                        mock_cached.return_value = mock_path
+                        
+                        result = pm.find_binary()
+                        assert result == mock_path
 
     def test_find_binary_not_found(self):
         """Test find_binary returns None when binary not found."""
         pm = ProcessManager()
         
+        original_exists = Path.exists
+        def mock_exists(self):
+            if "capiscio-core" in str(self) and "bin" in str(self):
+                return False
+            return original_exists(self)
+        
         with patch.dict(os.environ, {}, clear=True):
-            with patch("shutil.which", return_value=None):
-                with patch.object(ProcessManager, "_get_cached_binary_path") as mock_cached:
-                    mock_path = MagicMock()
-                    mock_path.exists.return_value = False
-                    mock_cached.return_value = mock_path
-                    
-                    result = pm.find_binary()
-                    assert result is None
+            with patch.object(Path, "exists", mock_exists):
+                with patch("shutil.which", return_value=None):
+                    with patch.object(ProcessManager, "_get_cached_binary_path") as mock_cached:
+                        mock_path = MagicMock()
+                        mock_path.exists.return_value = False
+                        mock_cached.return_value = mock_path
+                        
+                        result = pm.find_binary()
+                        assert result is None
 
     @patch("httpx.stream")
     @patch("os.chmod")

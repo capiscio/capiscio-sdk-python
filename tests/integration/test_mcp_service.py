@@ -24,9 +24,11 @@ def grpc_client() -> CapiscioRPCClient:
     client = CapiscioRPCClient(address=GRPC_ADDRESS, auto_start=False)
     try:
         client.connect()
+        # Verify the server is actually reachable (gRPC channels connect lazily)
+        grpc.channel_ready_future(client._channel).result(timeout=3)
         yield client
-    except grpc.RpcError as e:
-        pytest.skip(f"gRPC server not available at {GRPC_ADDRESS}: {e}")
+    except (grpc.RpcError, grpc.FutureTimeoutError):
+        pytest.skip(f"gRPC server not available at {GRPC_ADDRESS}")
     finally:
         client.close()
 

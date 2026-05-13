@@ -228,7 +228,7 @@ class TestDVOrderAPI:
         assert resp.status_code in [400, 422], "Order without JWK should be rejected"
         print("✅ Missing JWK correctly rejected")
     
-    def test_create_order_anonymous(self, test_jwk):
+    def test_create_order_anonymous(self, server_health_check, test_jwk):
         """Test that DV orders can be created anonymously (per RFC-002 v1.2 Anonymous DV)."""
         # Anonymous DV allows creation without API key - this is intentional!
         resp = requests.post(
