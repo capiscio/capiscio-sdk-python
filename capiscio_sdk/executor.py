@@ -102,7 +102,11 @@ class CapiscioSecurityExecutor:
             message_dict = {}
         
         # Extract identifier for rate limiting
-        identifier = message_dict.get("messageId") or message.message_id
+        identifier = (
+            message_dict.get("messageId")
+            or getattr(message, "message_id", None)
+            or getattr(message, "messageId", None)
+        )
         
         # Check rate limit
         if self._rate_limiter and identifier:

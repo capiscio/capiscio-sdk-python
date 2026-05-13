@@ -276,7 +276,7 @@ class MessageValidator:
                 continue
 
             # A2A v1: Part uses oneof content — exactly one of text/raw/url/data
-            present_content = [f for f in self.VALID_PART_CONTENT_FIELDS if f in part]
+            present_content = [f for f in self.VALID_PART_CONTENT_FIELDS if part.get(f) is not None]
 
             if len(present_content) == 0:
                 issues.append(
