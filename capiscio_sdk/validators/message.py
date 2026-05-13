@@ -10,12 +10,15 @@ from .url_security import URLSecurityValidator
 
 
 class MessageValidator:
-    """Validates A2A message structure and content (per official A2A spec)."""
+    """Validates A2A message structure and content (per official A2A v1 spec)."""
 
-    # Based on official A2A specification from a2a-python SDK
+    # A2A v1 protocol uses ProtoJSON serialization (ADR-001):
+    # - camelCase field names
+    # - SCREAMING_SNAKE_CASE enum values
+    # - Part uses oneof content (text/raw/url/data), no 'kind' discriminator
     REQUIRED_FIELDS = ["messageId", "role", "parts"]
-    VALID_ROLES = ["agent", "user"]
-    VALID_PART_KINDS = ["text", "file", "data"]
+    VALID_ROLES = ["ROLE_USER", "ROLE_AGENT"]
+    VALID_PART_CONTENT_FIELDS = ["text", "raw", "url", "data"]
 
     def __init__(self) -> None:
         """Initialize message validator."""
@@ -115,9 +118,10 @@ class MessageValidator:
                     parts_issues = self._validate_parts(message["parts"])
                     issues.extend(parts_issues)
 
-        # Validate optional fields if present
-        if "contextId" in message and message["contextId"] is not None:
-            if not isinstance(message["contextId"], str):
+        # Validate optional fields if present (A2A v1 ProtoJSON: camelCase)
+        context_id = message.get("contextId")
+        if context_id is not None:
+            if not isinstance(context_id, str):
                 issues.append(
                     ValidationIssue(
                         severity=ValidationSeverity.WARNING,
@@ -127,8 +131,9 @@ class MessageValidator:
                     )
                 )
 
-        if "taskId" in message and message["taskId"] is not None:
-            if not isinstance(message["taskId"], str):
+        task_id = message.get("taskId")
+        if task_id is not None:
+            if not isinstance(task_id, str):
                 issues.append(
                     ValidationIssue(
                         severity=ValidationSeverity.WARNING,
@@ -232,7 +237,7 @@ class MessageValidator:
                 max_score=20,
                 no_duplicate_skill_ids=True,  # N/A
                 field_lengths_valid=bool("messageId" in message and message.get("messageId")),
-                no_ssrf_risks=len([i for i in issues if "SSRF" in i.code or (i.path and "uri" in i.path.lower())]) == 0
+                no_ssrf_risks=len([i for i in issues if "SSRF" in i.code or (i.path and "url" in i.path.lower())]) == 0
             )
         )
         
@@ -246,7 +251,16 @@ class MessageValidator:
         )
 
     def _validate_parts(self, parts: List[Any]) -> List[ValidationIssue]:
-        """Validate message parts array (per A2A spec: TextPart, FilePart, DataPart)."""
+        """Validate message parts array per A2A v1 spec.
+
+        A2A v1 uses protobuf oneof for Part content:
+        - text (string)
+        - raw (bytes, base64 in JSON)
+        - url (string)
+        - data (google.protobuf.Value)
+
+        Optional fields: metadata, filename, media_type (mediaType in ProtoJSON).
+        """
         issues: List[ValidationIssue] = []
 
         for i, part in enumerate(parts):
@@ -261,100 +275,65 @@ class MessageValidator:
                 )
                 continue
 
-            # Check for 'kind' field (discriminator for Part types)
-            if "kind" not in part:
+            # A2A v1: Part uses oneof content — exactly one of text/raw/url/data
+            present_content = [f for f in self.VALID_PART_CONTENT_FIELDS if f in part]
+
+            if len(present_content) == 0:
                 issues.append(
                     ValidationIssue(
                         severity=ValidationSeverity.ERROR,
                         code="MISSING_FIELD",
-                        message=f"Part {i} missing 'kind' field",
-                        path=f"parts[{i}].kind",
+                        message=f"Part {i} must have one of {self.VALID_PART_CONTENT_FIELDS}",
+                        path=f"parts[{i}]",
                     )
                 )
                 continue
 
-            kind = part["kind"]
-            if kind not in self.VALID_PART_KINDS:
+            if len(present_content) > 1:
                 issues.append(
                     ValidationIssue(
                         severity=ValidationSeverity.WARNING,
-                        code="UNKNOWN_TYPE",
-                        message=f"Part {i} has unknown kind '{kind}' (expected: {self.VALID_PART_KINDS})",
-                        path=f"parts[{i}].kind",
+                        code="MULTIPLE_CONTENT_FIELDS",
+                        message=f"Part {i} has multiple content fields {present_content}; oneof expects exactly one",
+                        path=f"parts[{i}]",
                     )
                 )
 
-            # Validate based on part type
-            if kind == "text":
-                if "text" not in part:
-                    issues.append(
-                        ValidationIssue(
-                            severity=ValidationSeverity.ERROR,
-                            code="MISSING_FIELD",
-                            message=f"TextPart {i} must have 'text' field",
-                            path=f"parts[{i}].text",
-                        )
-                    )
-                elif not isinstance(part["text"], str):
+            content_field = present_content[0]
+
+            # Validate text content
+            if content_field == "text":
+                if not isinstance(part["text"], str):
                     issues.append(
                         ValidationIssue(
                             severity=ValidationSeverity.ERROR,
                             code="INVALID_TYPE",
-                            message=f"TextPart {i} 'text' must be a string",
+                            message=f"Part {i} 'text' must be a string",
                             path=f"parts[{i}].text",
                         )
                     )
 
-            elif kind == "file":
-                if "file" not in part:
-                    issues.append(
-                        ValidationIssue(
-                            severity=ValidationSeverity.ERROR,
-                            code="MISSING_FIELD",
-                            message=f"FilePart {i} must have 'file' field",
-                            path=f"parts[{i}].file",
-                        )
-                    )
-                else:
-                    file_obj = part["file"]
-                    if not isinstance(file_obj, dict):
-                        issues.append(
-                            ValidationIssue(
-                                severity=ValidationSeverity.ERROR,
-                                code="INVALID_TYPE",
-                                message=f"FilePart {i} 'file' must be an object",
-                                path=f"parts[{i}].file",
-                            )
-                        )
-                    else:
-                        # Must have either 'bytes' or 'uri'
-                        if "bytes" not in file_obj and "uri" not in file_obj:
-                            issues.append(
-                                ValidationIssue(
-                                    severity=ValidationSeverity.ERROR,
-                                    code="MISSING_FIELD",
-                                    message=f"FilePart {i} must have either 'bytes' or 'uri'",
-                                    path=f"parts[{i}].file",
-                                )
-                            )
-
-            elif kind == "data":
-                if "data" not in part:
-                    issues.append(
-                        ValidationIssue(
-                            severity=ValidationSeverity.ERROR,
-                            code="MISSING_FIELD",
-                            message=f"DataPart {i} must have 'data' field",
-                            path=f"parts[{i}].data",
-                        )
-                    )
-                elif not isinstance(part["data"], dict):
+            # Validate raw (base64 bytes) content
+            elif content_field == "raw":
+                if not isinstance(part["raw"], str):
                     issues.append(
                         ValidationIssue(
                             severity=ValidationSeverity.ERROR,
                             code="INVALID_TYPE",
-                            message=f"DataPart {i} 'data' must be an object",
-                            path=f"parts[{i}].data",
+                            message=f"Part {i} 'raw' must be a base64-encoded string",
+                            path=f"parts[{i}].raw",
+                        )
+                    )
+
+            # Validate url content
+            elif content_field == "url":
+                if not isinstance(part["url"], str):
+                    issues.append(
+                        ValidationIssue(
+                            severity=ValidationSeverity.ERROR,
+                            code="INVALID_TYPE",
+                            message=f"Part {i} 'url' must be a string",
+                            path=f"parts[{i}].url",
                         )
                     )
 
