@@ -92,6 +92,18 @@ def _print_agent_key_capture_hint(agent_id: str, private_jwk: dict) -> None:
 # Standalone Helper Functions (for testing and direct use)
 # =============================================================================
 
+def _did_method(did: str) -> str:
+    """Extract the method from a DID string (e.g. 'key' from 'did:key:z6Mk...')."""
+    parts = did.split(":", 3)
+    return parts[1] if len(parts) >= 3 else ""
+
+
+def _is_did_transition(did_a: str, did_b: str) -> bool:
+    """Return True if the two DIDs represent a safe did:key ↔ did:web transition."""
+    methods = {_did_method(did_a), _did_method(did_b)}
+    return methods == {"key", "web"}
+
+
 def _read_did_from_keys(identity_path: Path) -> Optional[str]:
     """
     Read DID from an identity directory.
@@ -552,7 +564,14 @@ class _Connector:
                                 server_did = agent_data.get("did")
                                 # Verify DID matches if server has one
                                 if not server_did or server_did == local_did:
-                                    return agent_data
+                                    if not self.name or agent_data.get("name") == self.name:
+                                        return agent_data
+                                # did:key ↔ did:web transitions are expected when
+                                # server upgrades DID method; agent_id already confirms identity.
+                                if _is_did_transition(local_did, server_did):
+                                    logger.debug(f"DID method transition for {agent_id}: {local_did} → {server_did}")
+                                    if not self.name or agent_data.get("name") == self.name:
+                                        return agent_data
                                 logger.debug(f"DID mismatch: local={local_did}, server={server_did}")
                         except Exception:
                             pass
@@ -594,8 +613,17 @@ class _Connector:
                             
                             # If server has DID, verify it matches local keys
                             if server_did and local_did and server_did != local_did:
-                                logger.warning(f"DID mismatch for {agent_id}: local={local_did}, server={server_did}")
-                                continue  # Don't use mismatched agent
+                                # did:key ↔ did:web transitions are expected when
+                                # server upgrades DID method; agent_id already confirms identity.
+                                if _is_did_transition(local_did, server_did):
+                                    logger.debug(f"DID method transition for {agent_id}: {local_did} → {server_did}")
+                                else:
+                                    logger.warning(f"DID mismatch for {agent_id}: local={local_did}, server={server_did}")
+                                    continue  # Don't use mismatched agent
+                            
+                            # If caller specified a name, only match agents with that name
+                            if self.name and agent_data.get("name") != self.name:
+                                continue
                             
                             return agent_data
                     except Exception:
@@ -679,8 +707,21 @@ class _Connector:
             # Derive DID from public key's kid field (RFC-002 §6.1: did:key is self-describing)
             try:
                 public_jwk = json.loads(public_key_path.read_text())
-                did = public_jwk.get("kid")
-                if did and did.startswith("did:"):
+                kid = public_jwk.get("kid")
+                if kid and kid.startswith("did:"):
+                    # Prefer did:web derived from server_url + agent_id (RFC-002 §6.1).
+                    # The JWK kid is did:key (key confirmation), but the agent's
+                    # primary DID should be did:web:<domain>:agents:<agent_id>.
+                    did = kid  # fallback
+                    if self.server_url and self.agent_id:
+                        try:
+                            from urllib.parse import urlparse
+                            domain = urlparse(self.server_url).netloc
+                            if domain:
+                                did = f"did:web:{domain}:agents:{self.agent_id}"
+                        except Exception:
+                            pass
+                    
                     logger.info(f"Recovered identity from existing keys: {did}")
                     
                     # Ensure DID is registered with server (may have failed previously)
