@@ -95,10 +95,12 @@ class TestEventEmitter:
         assert len(emitter._batch) == 1
         
         event = emitter._batch[0]
-        assert event["type"] == "test_event"
+        assert event["eventType"] == "test_event"
         assert event["agentId"] == "test-agent"
-        assert event["data"] == {"key": "value"}
+        assert event["payload"] == {"key": "value"}
+        assert event["severity"] == "info"
         assert "id" in event
+        assert "traceId" in event
         assert "timestamp" in event
 
     def test_emit_with_task_id(self):
@@ -111,7 +113,7 @@ class TestEventEmitter:
         
         emitter.emit("test_event", {}, task_id="task-123")
         
-        assert emitter._batch[0]["taskId"] == "task-123"
+        assert emitter._batch[0]["payload"]["task_id"] == "task-123"
 
     def test_emit_with_correlation_id(self):
         """Test emit with correlation_id."""
@@ -123,7 +125,7 @@ class TestEventEmitter:
         
         emitter.emit("test_event", {}, correlation_id="corr-456")
         
-        assert emitter._batch[0]["correlationId"] == "corr-456"
+        assert emitter._batch[0]["traceId"] == "corr-456"
 
     def test_emit_flushes_when_batch_full(self):
         """Test that emit flushes when batch is full."""
@@ -175,8 +177,8 @@ class TestEventEmitter:
         
         # Add events directly to batch
         emitter._batch = [
-            {"id": "1", "type": "event1", "data": {}},
-            {"id": "2", "type": "event2", "data": {}},
+            {"id": "1", "eventType": "event1", "payload": {}},
+            {"id": "2", "eventType": "event2", "payload": {}},
         ]
         
         mock_response = MagicMock()
@@ -187,14 +189,13 @@ class TestEventEmitter:
             
             assert result is True
             assert len(emitter._batch) == 0
-            mock_post.assert_called_once()
+            assert mock_post.call_count == 2  # Individual POST per event
             
-            call_kwargs = mock_post.call_args[1]
-            assert call_kwargs["json"]["events"] == [
-                {"id": "1", "type": "event1", "data": {}},
-                {"id": "2", "type": "event2", "data": {}},
-            ]
-            assert call_kwargs["headers"]["X-Capiscio-Registry-Key"] == "sk_test"
+            # Verify each event sent individually
+            calls = mock_post.call_args_list
+            assert calls[0][1]["json"] == {"id": "1", "eventType": "event1", "payload": {}}
+            assert calls[1][1]["json"] == {"id": "2", "eventType": "event2", "payload": {}}
+            assert calls[0][1]["headers"]["X-Capiscio-Registry-Key"] == "sk_test"
 
     def test_flush_requeues_on_failure(self):
         """Test that flush requeues events on server error."""
@@ -204,7 +205,7 @@ class TestEventEmitter:
             agent_id="test-agent",
         )
         
-        events = [{"id": "1", "type": "event1", "data": {}}]
+        events = [{"id": "1", "eventType": "event1", "payload": {}}]
         emitter._batch = events.copy()
         
         mock_response = MagicMock()
@@ -225,7 +226,7 @@ class TestEventEmitter:
             agent_id="test-agent",
         )
         
-        emitter._batch = [{"id": "1", "type": "event1", "data": {}}]
+        emitter._batch = [{"id": "1", "eventType": "event1", "payload": {}}]
         
         with patch.object(emitter._client, "post", side_effect=Exception("Network error")):
             result = emitter.flush()
@@ -243,7 +244,7 @@ class TestEventEmitter:
         )
         
         # Manually add event (bypassing emit's disabled check)
-        emitter._batch = [{"id": "1", "type": "event1", "data": {}}]
+        emitter._batch = [{"id": "1", "eventType": "event1", "payload": {}}]
         
         result = emitter.flush()
         

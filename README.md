@@ -1,4 +1,4 @@
-# CapiscIO Agent Guard
+# Agent Guard
 
 Runtime identity and trust enforcement for A2A agents.
 
@@ -6,7 +6,7 @@ Runtime identity and trust enforcement for A2A agents.
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
-**Agent Guard** is the CapiscIO runtime SDK for [A2A Protocol](https://github.com/google/A2A) agents. It provides identity management, request signing, badge verification, and trust enforcement with **zero configuration**.
+**Agent Guard** (`pip install capiscio-sdk`) is the CapiscIO runtime SDK for [A2A Protocol](https://github.com/google/A2A) agents. It provides identity management, request signing, badge verification, and trust enforcement with **zero configuration**.
 
 ## 🚀 The 60-Second Upgrade
 
@@ -649,6 +649,16 @@ Server-Timing: capiscio-auth;dur=0.618;desc="CapiscIO Verification"
 
 - [Official Documentation](https://docs.capisc.io)
 - [A2A Protocol Spec](https://github.com/google/A2A)
+
+## Related Packages
+
+| Package | What it does | Install |
+|---------|-------------|---------|
+| [CapiscIO CLI](https://github.com/capiscio/capiscio-python) | Agent validation for CI/CD pipelines | `pip install capiscio` |
+| [MCP Guard](https://github.com/capiscio/capiscio-mcp-python) | Trust enforcement for MCP tool servers | `pip install capiscio-mcp` |
+| [capiscio-core](https://github.com/capiscio/capiscio-core) | Go library, CLI binary, and gateway | `go install` |
+
+[Website](https://capisc.io) · [Platform](https://app.capisc.io)
 
 ## License
 
