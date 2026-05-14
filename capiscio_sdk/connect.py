@@ -42,6 +42,9 @@ PROD_DASHBOARD = "https://app.capisc.io"
 # Env var for injecting the private key in ephemeral environments
 ENV_AGENT_PRIVATE_KEY = "CAPISCIO_AGENT_PRIVATE_KEY_JWK"
 
+# Env var for overriding the keys directory
+ENV_KEYS_DIR = "CAPISCIO_KEY_DIR"
+
 
 # =============================================================================
 # Key injection helpers
@@ -223,7 +226,9 @@ class AgentIdentity:
     def get_badge(self) -> Optional[str]:
         """Get current badge (auto-renewed if needed)."""
         if self._keeper:
-            return self._keeper.get_current_badge()
+            badge = self._keeper.get_current_badge()
+            if badge:
+                return badge
         return self.badge
     
     def status(self) -> Dict[str, Any]:
@@ -335,6 +340,10 @@ class CapiscIO:
             agent_id = os.environ.get("CAPISCIO_AGENT_ID")
         if server_url is None:
             server_url = os.environ.get("CAPISCIO_SERVER_URL") or PROD_REGISTRY
+        if keys_dir is None:
+            env_keys = os.environ.get(ENV_KEYS_DIR)
+            if env_keys:
+                keys_dir = Path(env_keys)
 
         connector = _Connector(
             api_key=api_key,
@@ -870,7 +879,15 @@ class _Connector:
             logger.debug(f"Agent activation failed: {e} - non-critical")
     
     def _setup_badge(self):
-        """Set up BadgeKeeper for automatic badge management."""
+        """Set up badge management with PoP (IAL-1) preferred, CA (IAL-0) fallback.
+        
+        Per RFC-003, agents SHOULD prove key possession to obtain IAL-1
+        badges. This method tries PoP first, falling back to CA if the
+        server or agent keys are not PoP-ready.
+        
+        The keeper runs in CA mode for continuous renewal because the
+        keeper streaming RPC does not yet support PoP mode.
+        """
         try:
             from .badge_keeper import BadgeKeeper
             from .simple_guard import SimpleGuard
@@ -884,33 +901,96 @@ class _Connector:
                 keys_preloaded=True,
             )
             
-            # Set up BadgeKeeper with correct parameters
-            # Wire on_renew so the guard's badge token stays in sync
-            # when the keeper renews it in the background.
-            keeper = BadgeKeeper(
-                api_url=self.server_url,
-                api_key=self.api_key,
-                agent_id=self.agent_id,
-                mode="dev" if self.dev_mode else "ca",
-                output_file=str(self.keys_dir / "badge.jwt"),
-                on_renew=lambda token: guard.set_badge_token(token),
-            )
-            
-            # Start the keeper and get initial badge
-            keeper.start()
-            badge = keeper.get_current_badge()
-            # Get expiration from keeper if available, otherwise None
+            badge = None
             expires_at = None
-            if hasattr(keeper, 'badge_expires_at'):
-                expires_at = keeper.badge_expires_at
-            elif hasattr(keeper, 'get_badge_expiration'):
-                expires_at = keeper.get_badge_expiration()
+            
+            # Try PoP (IAL-1) for the initial badge — secure by default (RFC-003)
+            if not self.dev_mode:
+                badge, expires_at = self._request_pop_badge(guard)
+            
+            # Start keeper for continuous renewal (CA mode).
+            # Only start if PoP didn't succeed — otherwise the keeper would
+            # immediately overwrite the IAL-1 PoP badge with an IAL-0 CA badge.
+            # When PoP-based renewal is supported, keeper can be started always.
+            keeper = None
+            if badge is None:
+                private_key_file = self.keys_dir / "private.jwk"
+                keeper = BadgeKeeper(
+                    api_url=self.server_url,
+                    api_key=self.api_key,
+                    agent_id=self.agent_id,
+                    mode="dev" if self.dev_mode else "ca",
+                    output_file=str(self.keys_dir / "badge.jwt"),
+                    private_key_path=str(private_key_file) if private_key_file.exists() else None,
+                    on_renew=lambda token: guard.set_badge_token(token),
+                )
+                keeper.start()
+                badge = keeper.get_current_badge()
+                if hasattr(keeper, 'badge_expires_at'):
+                    expires_at = keeper.badge_expires_at
+                elif hasattr(keeper, 'get_badge_expiration'):
+                    expires_at = keeper.get_badge_expiration()
             
             return badge, expires_at, keeper, guard
             
         except Exception as e:
             logger.warning(f"Badge setup failed (continuing without badge): {e}")
             return None, None, None, None
+
+    def _request_pop_badge(self, guard):
+        """Request initial badge via PoP challenge-response (RFC-003).
+        
+        Returns an IAL-1 badge with cryptographic key binding (cnf claim).
+        Falls back gracefully if PoP is unavailable.
+        """
+        try:
+            private_key_path = self.keys_dir / "private.jwk"
+            if not private_key_path.exists():
+                logger.warning(
+                    "No private key at %s — skipping PoP, will use CA (IAL-0)",
+                    private_key_path,
+                )
+                return None, None
+            
+            private_key_jwk = private_key_path.read_text(encoding="utf-8").strip()
+            
+            # Ensure RPC client is available (identity recovery path
+            # may not have created one)
+            if self._rpc_client is None:
+                self._rpc_client = CapiscioRPCClient()
+                self._rpc_client.connect()
+            
+            success, result, error = self._rpc_client.badge.request_pop_badge(
+                agent_did=self.did,
+                private_key_jwk=private_key_jwk,
+                api_key=self.api_key,
+                ca_url=self.server_url,
+            )
+            
+            if success and result:
+                token = result["token"]
+                guard.set_badge_token(token)
+                
+                # Persist badge to disk
+                badge_path = self.keys_dir / "badge.jwt"
+                badge_path.write_text(token, encoding="utf-8")
+                
+                logger.info(
+                    "PoP badge acquired (IAL-1, jti=%s...)",
+                    (result.get("jti") or "unknown")[:8],
+                )
+                return token, result.get("expires_at")
+            else:
+                logger.warning(
+                    "PoP badge request failed: %s — falling back to CA (IAL-0)",
+                    error or "unknown error",
+                )
+                return None, None
+        except Exception as e:
+            logger.warning(
+                "PoP badge request error: %s — falling back to CA (IAL-0)", e
+            )
+            return None, None
 
 
 # Convenience alias
