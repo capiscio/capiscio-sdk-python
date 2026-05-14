@@ -56,6 +56,7 @@ class BadgeKeeperConfig:
         check_interval: Check interval in seconds (default: 5)
         trust_level: Trust level for CA mode (1-4, default: 1)
         rpc_address: Optional custom RPC address for capiscio-core
+        private_key_path: Optional path to private key JWK file
         on_renew: Optional callback(token: str) called when badge renews
         max_retries: Max retry attempts on renewal failure (default: 3)
         retry_backoff: Base backoff seconds for exponential retry (default: 2)
@@ -70,6 +71,7 @@ class BadgeKeeperConfig:
     check_interval: int = 5
     trust_level: int = 1
     rpc_address: Optional[str] = None
+    private_key_path: Optional[str] = None
     on_renew: Optional[Callable[[str], None]] = None
     max_retries: int = 3
     retry_backoff: int = 2
@@ -98,6 +100,7 @@ class BadgeKeeper:
         check_interval: int = 5,
         trust_level: int = 1,
         rpc_address: Optional[str] = None,
+        private_key_path: Optional[str] = None,
         on_renew: Optional[Callable[[str], None]] = None,
         max_retries: int = 3,
         retry_backoff: int = 2,
@@ -115,6 +118,7 @@ class BadgeKeeper:
             check_interval: Check interval in seconds (default: 5)
             trust_level: Trust level for CA mode (1-4, default: 1)
             rpc_address: Optional custom RPC address for capiscio-core
+            private_key_path: Optional path to private key JWK file
             on_renew: Optional callback(token: str) called when badge renews
             max_retries: Max retry attempts on renewal failure (default: 3)
             retry_backoff: Base backoff seconds for exponential retry (default: 2)
@@ -130,6 +134,7 @@ class BadgeKeeper:
             check_interval=check_interval,
             trust_level=trust_level,
             rpc_address=rpc_address,
+            private_key_path=private_key_path,
             on_renew=on_renew,
             max_retries=max_retries,
             retry_backoff=retry_backoff,
@@ -222,6 +227,7 @@ class BadgeKeeper:
                 renew_before_seconds=self.config.renewal_threshold,
                 check_interval_seconds=self.config.check_interval,
                 trust_level=self.config.trust_level,
+                private_key_path=self.config.private_key_path or "",
             ):
                 # Check stop signal
                 if self._stop_event.is_set():
