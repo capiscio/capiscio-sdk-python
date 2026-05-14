@@ -908,23 +908,23 @@ class _Connector:
             if not self.dev_mode:
                 badge, expires_at = self._request_pop_badge(guard)
             
-            # Start keeper for continuous renewal.
-            # Keeper uses CA mode because the streaming RPC does not yet
-            # support PoP challenge-response. The initial PoP badge
-            # establishes key binding; renewals maintain validity.
-            keeper = BadgeKeeper(
-                api_url=self.server_url,
-                api_key=self.api_key,
-                agent_id=self.agent_id,
-                mode="dev" if self.dev_mode else "ca",
-                output_file=str(self.keys_dir / "badge.jwt"),
-                private_key_path=str(self.keys_dir / "private.jwk"),
-                on_renew=lambda token: guard.set_badge_token(token),
-            )
-            keeper.start()
-            
-            # If PoP didn't produce a badge, fall back to keeper's CA badge
+            # Start keeper for continuous renewal (CA mode).
+            # Only start if PoP didn't succeed — otherwise the keeper would
+            # immediately overwrite the IAL-1 PoP badge with an IAL-0 CA badge.
+            # When PoP-based renewal is supported, keeper can be started always.
+            keeper = None
             if badge is None:
+                private_key_file = self.keys_dir / "private.jwk"
+                keeper = BadgeKeeper(
+                    api_url=self.server_url,
+                    api_key=self.api_key,
+                    agent_id=self.agent_id,
+                    mode="dev" if self.dev_mode else "ca",
+                    output_file=str(self.keys_dir / "badge.jwt"),
+                    private_key_path=str(private_key_file) if private_key_file.exists() else None,
+                    on_renew=lambda token: guard.set_badge_token(token),
+                )
+                keeper.start()
                 badge = keeper.get_current_badge()
                 if hasattr(keeper, 'badge_expires_at'):
                     expires_at = keeper.badge_expires_at
@@ -977,7 +977,7 @@ class _Connector:
                 
                 logger.info(
                     "PoP badge acquired (IAL-1, jti=%s...)",
-                    result.get("jti", "unknown")[:8],
+                    (result.get("jti") or "unknown")[:8],
                 )
                 return token, result.get("expires_at")
             else:
