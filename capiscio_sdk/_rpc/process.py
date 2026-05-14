@@ -52,7 +52,7 @@ def _cleanup_stale_sockets() -> None:
         pass
 
 # Binary download configuration
-CORE_VERSION = "2.7.0"
+CORE_VERSION = "2.7.1"
 GITHUB_REPO = "capiscio/capiscio-core"
 CACHE_DIR = DEFAULT_SOCKET_DIR / "bin"
 
