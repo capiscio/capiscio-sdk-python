@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-05-14
+
+### Changed
+- **PoP default badge mode**: `connect()` now attempts Proof-of-Possession (IAL-1) badge first, with transparent fallback to CA-issued (IAL-0) badges (#69)
+
+### Fixed
+- Pass `private_key_path` through to badge keeper RPC start call (#69)
+- Fix `__version__` in `__init__.py` (was stale at "2.6.0")
+
 ## [2.7.0] - 2026-05-13
 
 ### Added
@@ -355,4 +364,3 @@ order = create_dv_order(domain="example.com", challenge_type="http-01", jwk=jwk)
 [0.3.1]: https://github.com/capiscio/capiscio-sdk-python/releases/tag/v0.3.1
 [0.3.0]: https://github.com/capiscio/capiscio-sdk-python/releases/tag/v0.3.0
 [0.1.0]: https://github.com/capiscio/capiscio-sdk-python/releases/tag/v0.1.0
-
