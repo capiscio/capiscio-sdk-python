@@ -43,7 +43,7 @@ PROD_DASHBOARD = "https://app.capisc.io"
 ENV_AGENT_PRIVATE_KEY = "CAPISCIO_AGENT_PRIVATE_KEY_JWK"
 
 # Env var for overriding the keys directory
-ENV_KEYS_DIR = "CAPISCIO_KEYS_DIR"
+ENV_KEYS_DIR = "CAPISCIO_KEY_DIR"
 
 
 # =============================================================================
