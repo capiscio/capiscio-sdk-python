@@ -212,6 +212,17 @@ class AgentIdentity:
     _keeper: Any = field(default=None, repr=False)
     _emitter: Any = field(default=None, repr=False)
     
+    @property
+    def guard(self) -> "SimpleGuard":
+        """Access the SimpleGuard instance for signing/verifying."""
+        if self._guard is None:
+            from .simple_guard import SimpleGuard
+            self._guard = SimpleGuard(
+                agent_id=self.did or self.agent_id,
+                base_dir=str(self.keys_dir.parent),
+            )
+        return self._guard
+    
     def emit(self, event_type: str, data: Dict[str, Any]) -> bool:
         """Emit an event to the registry."""
         if not self._emitter:
