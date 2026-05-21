@@ -213,13 +213,13 @@ class SimpleGuard:
     def _resolve_project_root(self, base_dir: Optional[Union[str, Path]]) -> Path:
         """Resolve the project root directory.
         
-        When agent_id is provided explicitly, uses base_dir (or cwd) directly
-        without walking up the tree looking for agent-card.json.
+        When agent_id is provided explicitly or dev_mode is True, uses base_dir
+        (or cwd) directly without walking up the tree looking for agent-card.json.
         """
         current = Path(base_dir or os.getcwd()).resolve()
         
-        # When identity params are provided, don't walk looking for agent-card.json
-        if self._explicit_agent_id:
+        # When identity params are provided or in dev_mode, don't walk looking for agent-card.json
+        if self._explicit_agent_id or self.dev_mode:
             return current
         
         search_path = current
@@ -246,7 +246,16 @@ class SimpleGuard:
             logger.info(f"Using explicit agent_id: {self.agent_id}")
             return
         
-        # Case 3: Legacy agent-card.json (deprecated path)
+        # Case 3: Dev mode — placeholder until key generation
+        # (checked before legacy agent-card.json so dev_mode isn't
+        #  broken by an A2A agent-card.json that lacks public_keys)
+        if self.dev_mode:
+            logger.info("Dev Mode: Will generate did:key identity from keypair")
+            self.agent_id = "local-dev-agent"
+            self.signing_kid = "local-dev-key"
+            return
+        
+        # Case 4: Legacy agent-card.json (deprecated path)
         agent_card_path = self.project_root / "agent-card.json"
         if agent_card_path.exists():
             logger.warning(
@@ -268,13 +277,6 @@ class SimpleGuard:
                 raise
             except Exception as e:
                 raise ConfigurationError(f"Failed to load agent-card.json: {e}")
-            return
-            
-        # Case 4: Dev mode — placeholder until key generation
-        if self.dev_mode:
-            logger.info("Dev Mode: Will generate did:key identity from keypair")
-            self.agent_id = "local-dev-agent"
-            self.signing_kid = "local-dev-key"
             return
         
         raise ConfigurationError(
