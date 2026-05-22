@@ -214,12 +214,19 @@ class AgentIdentity:
     
     @property
     def guard(self) -> "SimpleGuard":
-        """Access the SimpleGuard instance for signing/verifying."""
+        """Access the SimpleGuard instance for signing/verifying.
+        
+        Reuses the identity's keys_dir and DID so the guard operates
+        with the same key material that connect() provisioned.
+        """
         if self._guard is None:
             from .simple_guard import SimpleGuard
             self._guard = SimpleGuard(
                 agent_id=self.did or self.agent_id,
-                base_dir=str(self.keys_dir.parent),
+                base_dir=str(self.keys_dir),
+                signing_kid=self.did,
+                badge_token=self.badge_jws,
+                keys_preloaded=True,
             )
         return self._guard
     
