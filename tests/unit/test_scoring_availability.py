@@ -1,7 +1,5 @@
 """Unit tests for capiscio_sdk.scoring.availability — AvailabilityScorer."""
 
-import pytest
-
 from capiscio_sdk.types import ValidationIssue, ValidationSeverity
 from capiscio_sdk.scoring.availability import AvailabilityScorer
 from capiscio_sdk.scoring.types import AvailabilityRating

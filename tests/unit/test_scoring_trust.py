@@ -1,7 +1,5 @@
 """Unit tests for capiscio_sdk.scoring.trust — TrustScorer."""
 
-import pytest
-
 from capiscio_sdk.types import ValidationIssue, ValidationSeverity
 from capiscio_sdk.scoring.trust import TrustScorer
 from capiscio_sdk.scoring.types import TrustRating
